@@ -1,0 +1,356 @@
+/* AI Agent Browser - Custom CSS Foundation */
+
+/* CSS Variables for Consistent Theming */
+:root {
+  /* Color Palette */
+  --primary-cyan: #22d3ee;
+  --primary-indigo: #6366f1;
+  --primary-purple: #8b5cf6;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--primary-cyan), var(--primary-indigo));
+  --gradient-secondary: linear-gradient(135deg, var(--primary-indigo), var(--primary-purple));
+  --gradient-success: linear-gradient(135deg, var(--accent-emerald), #059669);
+  --gradient-warning: linear-gradient(135deg, var(--accent-amber), #d97706);
+  --gradient-error: linear-gradient(135deg, var(--accent-rose), #dc2626);
+  
+  /* Frosted Glass */
+  --glass-bg: rgba(15, 23, 42, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-blur: 16px;
+  
+  /* Shadows */
+  --shadow-glow: 0 0 20px rgba(34, 211, 238, 0.3);
+  --shadow-glow-indigo: 0 0 20px rgba(99, 102, 241, 0.3);
+  --shadow-deep: 0 10px 25px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.15);
+  
+  /* Transitions */
+  --transition-fast: 200ms ease-out;
+  --transition-normal: 300ms ease-out;
+  --transition-slow: 500ms ease-out;
+}
+
+/* Global Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  background-attachment: fixed;
+  overflow: hidden;
+}
+
+/* Frosted Glass Utility Classes */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-intense {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.glass-subtle {
+  background: rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Glow Effect Utilities */
+.glow-cyan {
+  box-shadow: var(--shadow-glow);
+}
+
+.glow-indigo {
+  box-shadow: var(--shadow-glow-indigo);
+}
+
+.glow-hover:hover {
+  box-shadow: var(--shadow-glow);
+  transition: box-shadow var(--transition-normal);
+}
+
+/* Animated Gradient Backgrounds */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 0 30px rgba(34, 211, 238, 0.6);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes bounce-in {
+  0% { 
+    opacity: 0;
+    transform: scale(0.3) translateY(-20px);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1.05) translateY(-5px);
+  }
+  100% { 
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Gradient Button Styles */
+.btn-gradient-primary {
+  background: var(--gradient-primary);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all var(--transition-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-gradient-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-gradient-primary:active {
+  transform: translateY(0);
+}
+
+.btn-gradient-success {
+  background: var(--gradient-success);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all var(--transition-normal);
+}
+
+.btn-gradient-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-gradient-warning {
+  background: var(--gradient-warning);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all var(--transition-normal);
+}
+
+.btn-gradient-warning:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+.btn-gradient-error {
+  background: var(--gradient-error);
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+  border: none;
+  color: white;
+  font-weight: 600;
+  transition: all var(--transition-normal);
+}
+
+.btn-gradient-error:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+}
+
+/* Status Indicators */
+.status-pending {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #6b7280;
+  position: relative;
+}
+
+.status-executing {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--primary-cyan);
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+.status-completed {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-emerald);
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4));
+}
+
+.status-failed {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-rose);
+  filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.4));
+}
+
+/* Loading Animations */
+.loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.loading-pulse {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.loading-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Input Field Enhancements */
+.input-glass {
+  background: rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all var(--transition-normal);
+}
+
+.input-glass:focus {
+  border-color: var(--primary-cyan);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1), var(--shadow-glow);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+/* Card Enhancements */
+.card-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-normal);
+}
+
+.card-glass:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-deep);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Tab Enhancements */
+.tab-active {
+  position: relative;
+  background: rgba(34, 211, 238, 0.1);
+  border-bottom: 2px solid var(--primary-cyan);
+}
+
+.tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--gradient-primary);
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--gradient-primary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gradient-secondary);
+}
+
+/* Text Selection */
+::selection {
+  background: rgba(34, 211, 238, 0.3);
+  color: white;
+}
+
+/* Focus Styles */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.3);
+}
+
+/* Animation Classes */
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  :root {
+    --glass-blur: 12px;
+  }
+  
+  .glass {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}

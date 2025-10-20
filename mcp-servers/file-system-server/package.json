@@ -1,0 +1,23 @@
+{
+  "name": "file-system-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for file system operations",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --inspect index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  },
+  "keywords": [
+    "mcp",
+    "file",
+    "system",
+    "filesystem",
+    "io"
+  ],
+  "author": "AI Agent Browser",
+  "license": "MIT"
+}
