@@ -99,7 +99,8 @@ const App: React.FC = () => {
             console.log('✅ App initialization complete');
         } catch (error) {
             console.error('❌ Failed to initialize app:', error);
-            setInitializationStatus(`Initialization failed: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            setInitializationStatus(`Initialization failed: ${errorMessage}`);
             setIsInitialized(true); // Set to true even on failure to prevent retries
         }
     };
