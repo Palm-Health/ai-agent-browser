@@ -36,8 +36,21 @@ export default defineConfig(({ mode }) => {
             'fs',
             'path',
             'os'
-          ]
-        }
+          ],
+          output: {
+            manualChunks: {
+              'vendor': [
+                'react',
+                'react-dom',
+                'axios',
+              ],
+              'ui': [
+                // UI/styling libraries if applicable
+              ],
+            },
+          },
+        },
+        chunkSizeWarningLimit: 1000, // Increase if needed after splitting
       }
     };
 });
