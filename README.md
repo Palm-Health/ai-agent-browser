@@ -44,27 +44,19 @@ A powerful, model-agnostic AI browser that integrates deeply with the Model Cont
 
 For a containerized environment with all dependencies pre-configured:
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yourusername/ai-agent-browser.git
-   cd ai-agent-browser
-   ```
+```bash
+# Clone, configure, and start in 3 commands
+git clone https://github.com/yourusername/ai-agent-browser.git
+cd ai-agent-browser
+cp .env.example .env.local  # Edit this file with your API keys
+docker compose up --build
+```
 
-2. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local and add your API keys
-   ```
+Then open http://localhost:5173 in your browser.
 
-3. **Start with Docker Compose**
-   ```bash
-   docker compose up --build
-   ```
-
-4. **Access the application**
-   - Open http://localhost:5173 in your browser
-
-For detailed Docker instructions, see [DOCKER.md](./DOCKER.md)
+**📚 Documentation:**
+- **Quick Start**: [QUICKSTART-DOCKER.md](./QUICKSTART-DOCKER.md) - Get running in 3 minutes
+- **Full Guide**: [DOCKER.md](./DOCKER.md) - Complete Docker documentation
 
 ## 📦 Building Executables
 
