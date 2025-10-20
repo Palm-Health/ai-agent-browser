@@ -125,8 +125,22 @@ If port 5173 is busy, either:
 
 Verify the container can reach the internet:
 ```bash
+# Test basic connectivity
 docker exec ai-agent-browser ping -c 4 google.com
+
+# Test DNS resolution
+docker exec ai-agent-browser nslookup google.com
+
+# Test HTTPS connectivity to AI providers
+docker exec ai-agent-browser curl -I https://api.openai.com
+docker exec ai-agent-browser curl -I https://api.anthropic.com
 ```
+
+If connectivity fails:
+1. Check your host machine's internet connection
+2. Verify Docker's network settings
+3. Check firewall rules that might block container traffic
+4. Try using a different DNS server in docker-compose.yml
 
 ### NPM Install Fails
 
@@ -173,9 +187,63 @@ For production:
 - In production, use Docker secrets or external secret management
 - Regularly update base images for security patches
 
+## Useful Commands
+
+### Viewing Logs
+```bash
+# Follow logs in real-time
+docker compose logs -f
+
+# View logs from a specific time
+docker compose logs --since 5m
+
+# View last 100 lines
+docker compose logs --tail 100
+```
+
+### Inspecting the Container
+```bash
+# Get a shell inside the container
+docker exec -it ai-agent-browser /bin/bash
+
+# Check running processes
+docker exec ai-agent-browser ps aux
+
+# Check network connectivity
+docker exec ai-agent-browser ip addr
+docker exec ai-agent-browser netstat -tlnp
+```
+
+### Managing the Container
+```bash
+# Restart the container
+docker compose restart
+
+# Rebuild without cache
+docker compose build --no-cache
+
+# Remove and recreate
+docker compose down
+docker compose up --build
+```
+
+### Cleaning Up
+```bash
+# Remove stopped containers
+docker compose down
+
+# Remove containers and volumes
+docker compose down -v
+
+# Remove all images
+docker compose down --rmi all
+```
+
 ## Support
 
 For issues or questions:
 - Check the main README.md
-- Review Docker logs
+- Review Docker logs with `docker compose logs`
+- Run the test script: `./test-docker-setup.sh`
+- Check DOCKER.md troubleshooting section
 - Open an issue on GitHub

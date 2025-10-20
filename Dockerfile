@@ -54,16 +54,50 @@ EXPOSE 5174 5175 5176 5177
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 
-# Create a startup script
+# Create a startup script with proper error handling
 RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
 echo "🚀 Starting AI Agent Browser..."\n\
-echo "📦 Installing dependencies..."\n\
-npm install --silent\n\
-echo "✅ Dependencies installed"\n\
+echo "================================="\n\
+\n\
+# Function to handle shutdown gracefully\n\
+cleanup() {\n\
+    echo ""\n\
+    echo "🛑 Shutting down gracefully..."\n\
+    exit 0\n\
+}\n\
+\n\
+# Trap signals\n\
+trap cleanup SIGTERM SIGINT\n\
+\n\
+# Check if node_modules exists\n\
+if [ ! -d "node_modules" ]; then\n\
+    echo "📦 Installing dependencies..."\n\
+    npm install --silent || {\n\
+        echo "❌ Failed to install dependencies"\n\
+        exit 1\n\
+    }\n\
+    echo "✅ Dependencies installed"\n\
+else\n\
+    echo "✅ Dependencies already installed"\n\
+fi\n\
+\n\
+# Build the application\n\
 echo "🔨 Building application..."\n\
-npm run build\n\
+npm run build || {\n\
+    echo "❌ Build failed"\n\
+    exit 1\n\
+}\n\
 echo "✅ Build completed"\n\
-echo "🌐 Starting development server on port 5173..."\n\
+\n\
+echo ""\n\
+echo "🌐 Starting development server..."\n\
+echo "📍 Access the app at: http://localhost:5173"\n\
+echo "================================="\n\
+echo ""\n\
+\n\
+# Start the dev server with proper signal handling\n\
 exec npm run dev\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
