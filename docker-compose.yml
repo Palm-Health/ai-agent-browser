@@ -1,0 +1,46 @@
+services:
+  ai-agent-browser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-agent-browser
+    ports:
+      # Vite dev server
+      - "5173:5173"
+      # Alternative ports
+      - "5174:5174"
+      - "5175:5175"
+    environment:
+      # Set environment variables here or use .env file
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+      # API keys (use .env file in production, never commit these)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OLLAMA_ENDPOINT=${OLLAMA_ENDPOINT:-http://localhost:11434}
+    volumes:
+      # Mount source code for hot reload in development
+      - .:/app
+      - /app/node_modules
+    networks:
+      - ai-browser-network
+    restart: unless-stopped
+    # Enable internet access
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+
+networks:
+  ai-browser-network:
+    driver: bridge

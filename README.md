@@ -8,8 +8,11 @@ A powerful, model-agnostic AI browser that integrates deeply with the Model Cont
 - Node.js 18+ 
 - npm or yarn
 - API keys for desired AI providers
+- (Optional) Docker and Docker Compose for containerized deployment
 
 ### Installation & Setup
+
+#### Option 1: Local Installation (Recommended for Development)
 
 1. **Clone the repository**
    ```bash
@@ -36,6 +39,32 @@ A powerful, model-agnostic AI browser that integrates deeply with the Model Cont
    ```bash
    npm run dev
    ```
+
+#### Option 2: Docker Installation (Recommended for Production)
+
+For a containerized environment with all dependencies pre-configured:
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/ai-agent-browser.git
+   cd ai-agent-browser
+   ```
+
+2. **Set up environment variables**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local and add your API keys
+   ```
+
+3. **Start with Docker Compose**
+   ```bash
+   docker compose up --build
+   ```
+
+4. **Access the application**
+   - Open http://localhost:5173 in your browser
+
+For detailed Docker instructions, see [DOCKER.md](./DOCKER.md)
 
 ## 📦 Building Executables
 
