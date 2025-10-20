@@ -45,7 +45,6 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!isInitialized) {
             initializeApp();
-            setIsInitialized(true);
         }
     }, [isInitialized]);
 
