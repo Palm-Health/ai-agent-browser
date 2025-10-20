@@ -1,5 +1,0 @@
-{
-  "name": "AI Agent Browser",
-  "description": "An AI-powered web browser that integrates a conversational agent to perform autonomous tasks. The agent can interact with browser content, such as summarizing web pages or navigating, using Gemini's function calling capabilities.",
-  "requestFramePermissions": []
-}

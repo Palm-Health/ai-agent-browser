@@ -1,20 +1,23 @@
 {
   "name": "ai-agent-browser",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "AI Agent Browser - Model-Agnostic with MCP Integration",
+  "author": "AI Agent Browser Team",
   "main": "electron-dist/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "npm run build:electron && electron . --disable-gpu --disable-software-rasterizer --disable-gpu-sandbox --no-sandbox",
     "build:electron": "tsc --project tsconfig.electron.json",
-    "build": "vite build && npm run build:electron && electron-builder",
+    "build": "vite build && npm run build:electron",
+    "build:exe": "npm run build && npx electron-builder --win",
+    "build:portable": "npm run build && npx electron-builder --win --config.win.target=portable",
+    "clean": "node cleanup.js",
+    "clean:all": "node cleanup.js && npm run clean:git",
+    "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
-    "test": "tsx test-intelligent-routing.ts",
-    "test:routing": "tsx test-intelligent-routing.ts",
-    "debug": "node debug-fix.js",
-    "debug:full": "node debug-script.js",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -53,14 +56,15 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*",
+      "electron-dist/**/*",
       "node_modules/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity"
     },
     "win": {
-      "target": "nsis"
+      "target": "portable",
+      "sign": false
     },
     "linux": {
       "target": "AppImage"
