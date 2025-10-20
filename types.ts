@@ -413,3 +413,35 @@ export const nativeTools: FunctionDeclaration[] = [
 
 // Legacy tools export for backward compatibility
 export const tools = nativeTools;
+
+// Global type declarations for Electron API
+declare global {
+  interface Window {
+    electronAPI: {
+      createBrowserView: (tabId: string) => Promise<string | null>;
+      navigateBrowserView: (tabId: string, url: string) => Promise<{ success: boolean; url?: string; error?: string; retried?: boolean }>;
+      executeJavaScript: (tabId: string, code: string) => Promise<{ success: boolean; result?: any; error?: string }>;
+      getPageContent: (tabId: string) => Promise<{ success: boolean; content?: any; error?: string }>;
+      clickElement: (tabId: string, elementId: string) => Promise<{ success: boolean; error?: string }>;
+      fillFormElement: (tabId: string, elementId: string, value: string) => Promise<{ success: boolean; error?: string }>;
+      takeScreenshot: (tabId: string) => Promise<{ success: boolean; image?: Buffer | string; base64Png?: string; error?: string }>;
+      closeBrowserView: (tabId: string) => Promise<boolean>;
+      setActiveBrowserView: (tabId: string) => Promise<boolean>;
+      onPageLoaded: (callback: (tabId: string) => void) => void;
+      onPageNavigated: (callback: (tabId: string, url: string) => void) => void;
+      onPageTitleUpdated: (callback: (tabId: string, title: string) => void) => void;
+      onPageLoadFailed: (callback: (tabId: string, errorCode: number, errorDescription: string) => void) => void;
+      startMCPServer: (serverConfig: any) => Promise<{ success: boolean; serverId?: string }>;
+      stopMCPServer: (serverId: string) => Promise<{ success: boolean }>;
+      getMCPTools: (serverId: string) => Promise<{ success: boolean; tools?: any[] }>;
+      removeAllListeners: (channel: string) => void;
+      // Additional methods that may not be implemented yet
+      clickHandle?: (tabId: string, handle: string) => Promise<{ success: boolean; error?: string }>;
+      typeInto?: (tabId: string, handle: string, text: string, replace: boolean, delayMs: number) => Promise<{ success: boolean; error?: string }>;
+      selectOption?: (tabId: string, handle: string, option: string) => Promise<{ success: boolean; error?: string }>;
+      waitFor?: (tabId: string, condition: any) => Promise<{ success: boolean; error?: string }>;
+      scrollIntoView?: (tabId: string, handle: string) => Promise<{ success: boolean; error?: string }>;
+      saveFile?: (mimeType: string, data: string, path: string) => Promise<{ success: boolean; error?: string }>;
+    };
+  }
+}
