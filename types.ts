@@ -262,6 +262,31 @@ export interface Tab {
     isLoading: boolean;
 }
 
+export interface VaultSnapshotMetadata {
+    title?: string;
+    tags?: string[];
+    [key: string]: any;
+}
+
+export interface VaultSnapshotIndexEntry {
+    id: string;
+    url: string;
+    title: string;
+    createdAt: string;
+    htmlPath: string;
+    markdownPath: string;
+    metadata?: VaultSnapshotMetadata;
+}
+
+export interface VaultSnapshot extends VaultSnapshotIndexEntry {
+    html: string;
+    markdown: string;
+}
+
+export interface VaultSnapshotFilters {
+    query?: string;
+}
+
 // Configuration Types
 export interface AppConfig {
   aiProviders: {
@@ -394,6 +419,27 @@ export const nativeTools: FunctionDeclaration[] = [
         name: 'take_screenshot',
         description: 'Takes a screenshot of the current page.',
         parameters: { type: Type.OBJECT, properties: {} },
+    },
+    {
+        name: 'vault.list_pages',
+        description: 'List saved vault snapshots with optional query filter.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                query: { type: Type.STRING, description: 'Optional search string that matches title or URL.' },
+            },
+        },
+    },
+    {
+        name: 'vault.get_page',
+        description: 'Retrieve a saved vault page including HTML and markdown by id.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: 'Snapshot id returned by vault.list_pages.' },
+            },
+            required: ['id'],
+        },
     },
     {
         name: 'summarize_current_page',
