@@ -1,0 +1,66 @@
+name: Smoke Tests (Browser & Orchestrator)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main", "dev"]
+    types: [opened, reopened, synchronize, labeled]
+
+jobs:
+  smoke:
+    name: Run smoke tests in simulation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'needs-smoke-test') || (github.event.action == 'labeled' && github.event.label.name == 'needs-smoke-test')))
+    env:
+      SAFE_MODE: "true"
+      SIMULATION_MODE: "true"
+      CI: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Install Playwright browsers (Chromium)
+        run: pnpm dlx playwright install chromium --with-deps
+
+      - name: Run browser & orchestrator smoke tests
+        run: |
+          set -euo pipefail
+          SCRIPT=$(node - <<'NODE'
+          const { scripts = {} } = require('./package.json');
+          if (scripts['qa:smoke']) {
+            console.log('qa:smoke');
+          } else if (scripts['orchestrator:smoke-test']) {
+            console.log('orchestrator:smoke-test');
+          } else {
+            console.error('Missing smoke test script. Add a qa:smoke or orchestrator:smoke-test script to package.json that visits example.com and runs a marketing.campaign mission.');
+            process.exit(1);
+          }
+          NODE
+          )
+          echo "Executing pnpm run ${SCRIPT}"
+          pnpm run "${SCRIPT}" | tee smoke-test-log.txt
+
+      - name: Upload smoke test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-log
+          path: smoke-test-log.txt
+          if-no-files-found: warn

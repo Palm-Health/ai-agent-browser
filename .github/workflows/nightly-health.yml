@@ -1,0 +1,94 @@
+name: Nightly Maintenance Health Check
+
+on:
+  schedule:
+    # 06:00 UTC is 01:00 ET (nightly)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  nightly-health:
+    name: Run nightly maintenance and health audit
+    runs-on: ubuntu-latest
+    env:
+      SAFE_MODE: "true"
+      SIMULATION_MODE: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run self-healing supervisor (healing:run-supervisor)
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(s['healing:run-supervisor']?0:1)"; then
+            echo "Launching self-healing supervisor in safe/simulation mode"
+            pnpm run healing:run-supervisor
+          else
+            echo "Missing healing:run-supervisor script; failing health workflow"
+            exit 1
+          fi
+
+      - name: Run orchestrator mission (system.health_audit)
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(s['orchestrator.run']?0:1)"; then
+            echo "Running orchestrator mission in simulation mode"
+            pnpm run orchestrator.run -- --mission system.health_audit --mode simulation
+          else
+            echo "Missing orchestrator.run script; failing health workflow"
+            exit 1
+          fi
+
+      - name: Generate health report
+        id: health_report
+        run: |
+          REPORT_FILE="artifacts/system-health-$(date -u +%F).md"
+          mkdir -p artifacts
+          OVERALL_STATE="Simulation run completed; review supervisor/orchestrator logs for detailed status."
+          cat <<EOF2 > "$REPORT_FILE"
+          # Nightly System Health Report
+
+          - Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          - Mode: SAFE_MODE=${SAFE_MODE}, SIMULATION_MODE=${SIMULATION_MODE}
+
+          ## Overall Health State
+          - ${OVERALL_STATE}
+
+          ## Top 5 Recent Issues
+          - Captured from supervisor mission logs (see workflow run).
+          - Captured from orchestrator mission logs (see workflow run).
+          - (Add additional issue summaries here as automation evolves.)
+
+          ## Auto-fixes Attempted
+          - Supervisor attempted healing routines in simulation mode; see logs for actions taken.
+          - Orchestrator executed system.health_audit in simulation mode.
+          EOF2
+          echo "report_file=$REPORT_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload health report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-health-report
+          path: ${{ steps.health_report.outputs.report_file }}
+          if-no-files-found: error
+
+      - name: Post summary to log
+        run: |
+          echo "Health report generated at: ${{ steps.health_report.outputs.report_file }}"
+          echo "--- Report Preview ---"
+          sed -n '1,40p' "${{ steps.health_report.outputs.report_file }}"
