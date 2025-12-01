@@ -1,0 +1,18 @@
+area:browser:
+  - 'src/server/agent/browser/**'
+area:orchestrator:
+  - 'src/server/orchestrator/**'
+area:marketing:
+  - 'src/server/marketing/**'
+  - 'dashboard/app/marketing/**'
+area:self-healing:
+  - 'src/server/health/**'
+area:shadow-mode:
+  - 'src/server/shadow/**'
+area:voice:
+  - 'src/server/voice/**'
+  - 'src/app/api/voice/**'
+  - 'src/pages/api/voice/**'
+  - 'src/server/api/voice/**'
+area:database:
+  - 'supabase/migrations/**'
