@@ -4,6 +4,7 @@ import { mcpManager } from './mcp/mcpManager';
 import { mcpToolRegistry } from './mcp/toolRegistry';
 import { mcpServerRouter } from './mcp/mcpServerRouter';
 import { configService } from './config';
+import { vaultService } from './vaultService';
 
 export class EnhancedToolService {
   private executionHistory: Array<{ toolName: string; success: boolean; executionTime: number; timestamp: number }> = [];
@@ -123,6 +124,12 @@ export class EnhancedToolService {
       
       case 'task_completed':
         return await this.taskCompleted(args.summary as string);
+
+      case 'vault.list_pages':
+        return await this.listVaultPages(args.query as string | undefined);
+
+      case 'vault.get_page':
+        return await this.getVaultPage(args.id as string);
       
       default:
         return {
@@ -315,6 +322,46 @@ export class EnhancedToolService {
       return {
         success: false,
         error: `Summarization failed: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  private async listVaultPages(query?: string): Promise<ToolResult> {
+    try {
+      const entries = await vaultService.listSnapshots({ query });
+      return {
+        success: true,
+        data: entries,
+        message: `Found ${entries.length} saved page(s) in the vault.`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to list vault pages: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  private async getVaultPage(id: string): Promise<ToolResult> {
+    if (!id) {
+      return { success: false, error: 'Snapshot id is required.' };
+    }
+
+    try {
+      const snapshot = await vaultService.getSnapshotById(id);
+      if (!snapshot) {
+        return { success: false, error: `Snapshot ${id} not found.` };
+      }
+
+      return {
+        success: true,
+        data: snapshot,
+        message: `Loaded vault snapshot '${snapshot.title}'.`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to load vault snapshot: ${(error as Error).message}`,
       };
     }
   }

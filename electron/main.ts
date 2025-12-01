@@ -1,5 +1,10 @@
 const electron = require('electron');
+const path = require('path');
 const { join } = require('path');
+const fs = require('fs');
+const fsp = require('fs').promises;
+const os = require('os');
+const crypto = require('crypto');
 
 const { app, BrowserWindow, ipcMain, session, protocol } = electron;
 
@@ -21,6 +26,162 @@ const electronDir = process.cwd();
 // Keep a global reference of the window object
 let mainWindow: any = null;
 let browserTabs: Map<string, any> = new Map();
+
+class VaultManager {
+  basePath: string;
+
+  constructor(basePath: string = path.join(os.homedir(), 'PalmVault')) {
+    this.basePath = basePath;
+  }
+
+  private async ensureStructure(): Promise<void> {
+    await fsp.mkdir(path.join(this.basePath, 'pages'), { recursive: true });
+    await fsp.mkdir(path.join(this.basePath, 'markdown'), { recursive: true });
+    await fsp.mkdir(path.join(this.basePath, 'assets'), { recursive: true });
+    const indexPath = path.join(this.basePath, 'index.json');
+    try {
+      await fsp.access(indexPath);
+    } catch {
+      await fsp.writeFile(indexPath, JSON.stringify([], null, 2), 'utf-8');
+    }
+  }
+
+  private async loadIndex(): Promise<any[]> {
+    await this.ensureStructure();
+    const indexPath = path.join(this.basePath, 'index.json');
+    try {
+      const content = await fsp.readFile(indexPath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('Failed to read vault index:', error);
+      return [];
+    }
+  }
+
+  private async saveIndex(entries: any[]): Promise<void> {
+    await this.ensureStructure();
+    const indexPath = path.join(this.basePath, 'index.json');
+    await fsp.writeFile(indexPath, JSON.stringify(entries, null, 2), 'utf-8');
+  }
+
+  async overwriteIndex(entries: any[]): Promise<void> {
+    await this.saveIndex(entries);
+  }
+
+  async savePageSnapshot(payload: { url: string; html: string; metadata?: any }): Promise<any> {
+    const { url, html, metadata = {} } = payload;
+    if (!url) throw new Error('URL is required');
+
+    await this.ensureStructure();
+    const id = metadata.id || crypto.randomUUID();
+    const title = (metadata.title || 'Untitled Page').trim();
+    const htmlPath = path.join('pages', `${id}.html`);
+    const markdownPath = path.join('markdown', `${id}.md`);
+    const markdown = this.createMarkdown(html, url, title);
+
+    await fsp.writeFile(path.join(this.basePath, htmlPath), html, 'utf-8');
+    await fsp.writeFile(path.join(this.basePath, markdownPath), markdown, 'utf-8');
+
+    const entries = await this.loadIndex();
+    const without = entries.filter((entry: any) => entry.id !== id);
+    const snapshot = {
+      id,
+      url,
+      title,
+      createdAt: new Date().toISOString(),
+      htmlPath,
+      markdownPath,
+      metadata,
+    };
+
+    without.push(snapshot);
+    await this.saveIndex(without);
+
+    return { ...snapshot, html, markdown };
+  }
+
+  async listSnapshots(filters: { query?: string } = {}): Promise<any[]> {
+    const entries = await this.loadIndex();
+    if (!filters.query) return entries;
+    const q = filters.query.toLowerCase();
+    return entries.filter((entry: any) =>
+      entry.title.toLowerCase().includes(q) || entry.url.toLowerCase().includes(q)
+    );
+  }
+
+  async getSnapshotById(id: string): Promise<any | null> {
+    const entries = await this.loadIndex();
+    const entry = entries.find((item: any) => item.id === id);
+    if (!entry) return null;
+    const html = await fsp.readFile(path.join(this.basePath, entry.htmlPath), 'utf-8');
+    const markdown = await fsp.readFile(path.join(this.basePath, entry.markdownPath), 'utf-8');
+    return { ...entry, html, markdown };
+  }
+
+  private createMarkdown(html: string, url: string, title: string): string {
+    const safeHtml = html
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    const text = safeHtml
+      .replace(/\s+/g, ' ')
+      .replace(/<[^>]+>/g, '\n')
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .join('\n');
+    return `# ${title}\nSource: ${url}\n\n${text}`;
+  }
+
+  async renderVaultRoute(requestUrl: string): Promise<Buffer> {
+    const parsed = new URL(requestUrl);
+    const route = parsed.hostname || parsed.pathname.replace(/^\//, '');
+    const pathSegments = parsed.pathname.split('/').filter(Boolean);
+
+    if (route === 'list' || route === '') {
+      const snapshots = await this.listSnapshots();
+      const html = `<!DOCTYPE html><html><head><title>Vault</title><style>
+        body { font-family: Arial, sans-serif; background: #0b1220; color: #e5e7eb; padding: 24px; }
+        h1 { color: #22d3ee; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+        a { color: #38bdf8; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .meta { color: #9ca3af; font-size: 12px; }
+      </style></head><body><h1>Saved Vault Pages</h1>
+      ${snapshots
+        .map(
+          (s: any) =>
+            `<div class="card"><a href="vault://page/${s.id}"><strong>${s.title}</strong></a><div class="meta">${s.url} · ${
+              new Date(s.createdAt).toLocaleString()
+            }</div></div>`
+        )
+        .join('')}
+      </body></html>`;
+      return Buffer.from(html);
+    }
+
+    if (route.startsWith('page')) {
+      const id = route === 'page' ? pathSegments[0] : route.split('/')[1] || pathSegments[0];
+      const snapshot = id ? await this.getSnapshotById(id) : null;
+      if (!snapshot) {
+        return Buffer.from('<html><body><h2>Snapshot not found</h2></body></html>');
+      }
+      const html = `<!DOCTYPE html><html><head><base href="${snapshot.url}" /><title>${snapshot.title}</title></head><body>
+        <div style="padding:12px;background:#0f172a;color:#e5e7eb;font-family:Arial,sans-serif;">
+          <div style="margin-bottom:12px;">
+            <div style="color:#22d3ee;font-weight:bold;">${snapshot.title}</div>
+            <div style="color:#94a3b8;font-size:12px;">${snapshot.url}</div>
+          </div>
+        </div>
+        ${snapshot.html}
+      </body></html>`;
+      return Buffer.from(html);
+    }
+
+    return Buffer.from('<html><body><h2>Unsupported vault route</h2></body></html>');
+  }
+}
+
+const vaultManager = new VaultManager();
 
 async function createWindow(): Promise<void> {
   // Create the browser window with improved security and performance
@@ -135,13 +296,34 @@ protocol.registerSchemesAsPrivileged([
       corsEnabled: true,
     },
   },
+  {
+    scheme: 'vault',
+    privileges: {
+      standard: true,
+      secure: true,
+      bypassCSP: true,
+      allowServiceWorkers: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
 ]);
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   console.log('🚀 Electron app is ready, creating window...');
-  
+
   try {
+    protocol.registerBufferProtocol('vault', async (request, respond) => {
+      try {
+        const data = await vaultManager.renderVaultRoute(request.url);
+        respond({ mimeType: 'text/html', data });
+      } catch (error) {
+        console.error('Failed to serve vault protocol:', error);
+        respond({ mimeType: 'text/html', data: Buffer.from('<html><body><h2>Vault error</h2></body></html>') });
+      }
+    });
+
     await createWindow();
     console.log('✅ Window created successfully');
   } catch (error) {
@@ -378,3 +560,27 @@ ipcMain.handle('get-mcp-tools', async (event, serverId: string) => {
   console.log('Getting MCP tools for server:', serverId);
   return { success: true, tools: [] };
 });
+
+ipcMain.handle('vault-save-snapshot', async (event, payload) => {
+  try {
+    return await vaultManager.savePageSnapshot(payload);
+  } catch (error) {
+    console.error('Failed to save vault snapshot:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('vault-list-pages', async (event, filters) => {
+  return await vaultManager.listSnapshots(filters || {});
+});
+
+ipcMain.handle('vault-get-page', async (event, id: string) => {
+  return await vaultManager.getSnapshotById(id);
+});
+
+ipcMain.handle('vault-write-index', async (event, entries) => {
+  await vaultManager.overwriteIndex(entries || []);
+  return true;
+});
+
+ipcMain.handle('vault-get-base-path', () => vaultManager.basePath);

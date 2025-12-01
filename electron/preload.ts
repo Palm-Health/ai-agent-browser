@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopMCPServer: (serverId: string) => ipcRenderer.invoke('stop-mcp-server', serverId),
   getMCPTools: (serverId: string) => ipcRenderer.invoke('get-mcp-tools', serverId),
 
+  // Vault service
+  vaultSaveSnapshot: (payload: any) => ipcRenderer.invoke('vault-save-snapshot', payload),
+  vaultListPages: (filters: any) => ipcRenderer.invoke('vault-list-pages', filters),
+  vaultGetPage: (id: string) => ipcRenderer.invoke('vault-get-page', id),
+  vaultWriteIndex: (entries: any[]) => ipcRenderer.invoke('vault-write-index', entries),
+  vaultGetBasePath: () => ipcRenderer.invoke('vault-get-base-path'),
+
   // Remove event listeners
   removeAllListeners: (channel: string) => ipcRenderer.removeAllListeners(channel),
 });
@@ -56,6 +63,13 @@ interface ElectronAPI {
   stopMCPServer: (serverId: string) => Promise<{ success: boolean }>;
   getMCPTools: (serverId: string) => Promise<{ success: boolean; tools?: any[] }>;
   removeAllListeners: (channel: string) => void;
+
+  // Vault API
+  vaultSaveSnapshot: (payload: any) => Promise<any>;
+  vaultListPages: (filters: any) => Promise<any[]>;
+  vaultGetPage: (id: string) => Promise<any>;
+  vaultWriteIndex: (entries: any[]) => Promise<boolean>;
+  vaultGetBasePath: () => Promise<string>;
 }
 
 // Global declaration moved to types file
