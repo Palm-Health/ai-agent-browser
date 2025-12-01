@@ -1,0 +1,72 @@
+name: Core CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main", "dev"]
+
+jobs:
+  build-and-verify:
+    name: Install, Lint, Typecheck, Test, Build, QA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Run lint (if present)
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(s.lint?0:1)"; then
+            echo "Lint script found; running pnpm lint"
+            pnpm lint
+          else
+            echo "No lint script found; skipping lint"
+          fi
+
+      - name: Run type checks (typecheck or ts:check)
+        run: |
+          SCRIPT=$(node -e "const s=require('./package.json').scripts||{}; if(s['typecheck']){console.log('typecheck');} else if(s['ts:check']){console.log('ts:check');} else process.exit(1);") || true
+          if [ -n "$SCRIPT" ]; then
+            echo "Running pnpm $SCRIPT"
+            pnpm run "$SCRIPT"
+          else
+            echo "No typecheck/ts:check script found; skipping type checks"
+          fi
+
+      - name: Run tests (if present)
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(s.test?0:1)"; then
+            echo "Test script found; running pnpm test"
+            pnpm test
+          else
+            echo "No test script found; skipping tests"
+          fi
+
+      - name: Build project
+        run: pnpm build
+
+      - name: Run smoke tests (qa:smoke if present)
+        run: |
+          if node -e "const s=require('./package.json').scripts||{}; process.exit(s['qa:smoke']?0:1)"; then
+            echo "Smoke test script found; running pnpm qa:smoke"
+            pnpm run qa:smoke
+          else
+            echo "No qa:smoke script found; skipping smoke tests"
+          fi
