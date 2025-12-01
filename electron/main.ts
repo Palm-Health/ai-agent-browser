@@ -3,6 +3,10 @@ const { join } = require('path');
 
 const { app, BrowserWindow, ipcMain, session, protocol } = electron;
 
+const isSmokeTest = process.argv.includes('--smoke-test');
+const isProduction = app.isPackaged || process.env.NODE_ENV === 'production';
+process.env.NODE_ENV = isProduction ? 'production' : 'development';
+
 // Fix Windows cache issues and improve network performance
 app.commandLine.appendSwitch('--disable-gpu');
 app.commandLine.appendSwitch('--disable-software-rasterizer');
@@ -16,7 +20,13 @@ app.commandLine.appendSwitch('--disable-background-timer-throttling');
 app.commandLine.appendSwitch('--disable-renderer-backgrounding');
 app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
 
-const electronDir = process.cwd();
+const projectRoot = process.cwd();
+const preloadPath = isProduction
+  ? join(__dirname, 'preload.js')
+  : join(projectRoot, 'electron-dist/preload.js');
+const fallbackRendererPath = isProduction
+  ? join(__dirname, '../dist/index.html')
+  : join(projectRoot, 'dist/index.html');
 
 // Keep a global reference of the window object
 let mainWindow: any = null;
@@ -30,7 +40,7 @@ async function createWindow(): Promise<void> {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: join(electronDir, 'electron-dist/preload.js'),
+      preload: preloadPath,
       webSecurity: false, // Disable for development
       allowRunningInsecureContent: true, // Allow HTTP content
       experimentalFeatures: true,
@@ -58,37 +68,47 @@ async function createWindow(): Promise<void> {
     });
   });
 
-  // Load the app - try ports in order with proper error handling
-  const ports = ['5173', '5174', '5175', '5176', '5177', '5178', '5179', '5180', '5181', '5182'];
-  let loaded = false;
-  
-  for (const port of ports) {
-    try {
-      const viteUrl = `http://localhost:${port}`;
-      console.log(`🔍 Trying to load from ${viteUrl}...`);
-      
-      // Use a timeout to avoid hanging
-      const loadPromise = mainWindow.loadURL(viteUrl);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Load timeout')), 5000)
-      );
-      
-      await Promise.race([loadPromise, timeoutPromise]);
-      console.log(`✅ Successfully loaded Vite from ${viteUrl}`);
-      mainWindow.webContents.openDevTools();
-      loaded = true;
-      break;
-    } catch (error) {
-      console.log(`❌ Failed to load from port ${port}: ${error.message}`);
+  if (!isProduction) {
+    // Load the app - try ports in order with proper error handling
+    const ports = ['5173', '5174', '5175', '5176', '5177', '5178', '5179', '5180', '5181', '5182'];
+    let loaded = false;
+
+    for (const port of ports) {
+      try {
+        const viteUrl = `http://localhost:${port}`;
+        console.log(`🔍 Trying to load from ${viteUrl}...`);
+
+        // Use a timeout to avoid hanging
+        const loadPromise = mainWindow.loadURL(viteUrl);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Load timeout')), 5000)
+        );
+
+        await Promise.race([loadPromise, timeoutPromise]);
+        console.log(`✅ Successfully loaded Vite from ${viteUrl}`);
+        if (!isSmokeTest) {
+          mainWindow.webContents.openDevTools();
+        }
+        loaded = true;
+        break;
+      } catch (error) {
+        console.log(`❌ Failed to load from port ${port}: ${error.message}`);
+      }
     }
-  }
-  
-  if (!loaded) {
-    console.log('⚠️ Failed to load Vite dev server, loading fallback...');
+
+    if (!loaded) {
+      console.log('⚠️ Failed to load Vite dev server, loading fallback...');
+      try {
+        await mainWindow.loadFile(fallbackRendererPath);
+      } catch (fallbackError) {
+        console.error('❌ Fallback also failed:', fallbackError);
+      }
+    }
+  } else {
     try {
-      await mainWindow.loadFile(join(electronDir, '../dist/index.html'));
+      await mainWindow.loadFile(fallbackRendererPath);
     } catch (fallbackError) {
-      console.error('❌ Fallback also failed:', fallbackError);
+      console.error('❌ Failed to load packaged renderer:', fallbackError);
     }
   }
 
@@ -122,6 +142,44 @@ async function createWindow(): Promise<void> {
   });
 }
 
+async function runSmokeTest(): Promise<void> {
+  console.log('🚬 Starting Windows installer smoke test window...');
+  try {
+    const smokeWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
+      show: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+
+    const smokePage =
+      'data:text/html,<html><body style="font-family: sans-serif; display:flex; align-items:center; justify-content:center; height:100%;"><h1>Health OK</h1></body></html>';
+    await smokeWindow.loadURL(smokePage);
+    smokeWindow.once('ready-to-show', () => smokeWindow.show());
+
+    setTimeout(() => {
+      console.log('✅ Smoke test completed successfully.');
+      app.exit(0);
+    }, 4000);
+
+    smokeWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error('💥 Smoke test renderer process gone!', details);
+      app.exit(1);
+    });
+
+    smokeWindow.webContents.on('crashed', (event, killed) => {
+      console.error('💥 Smoke test renderer crashed!', { killed });
+      app.exit(1);
+    });
+  } catch (error) {
+    console.error('❌ Smoke test failed to start:', error);
+    app.exit(1);
+  }
+}
+
 // Set up custom protocol for AI-enhanced navigation BEFORE app is ready
 protocol.registerSchemesAsPrivileged([
   {
@@ -140,8 +198,13 @@ protocol.registerSchemesAsPrivileged([
 // This method will be called when Electron has finished initialization
 app.whenReady().then(async () => {
   console.log('🚀 Electron app is ready, creating window...');
-  
+
   try {
+    if (isSmokeTest) {
+      await runSmokeTest();
+      return;
+    }
+
     await createWindow();
     console.log('✅ Window created successfully');
   } catch (error) {

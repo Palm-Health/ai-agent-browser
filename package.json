@@ -18,7 +18,8 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "release:win": "tsx tools/build/windowsRelease.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
@@ -47,27 +48,5 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "wait-on": "^7.2.0"
-  },
-  "build": {
-    "appId": "com.ai-agent-browser",
-    "productName": "AI Agent Browser",
-    "directories": {
-      "output": "dist-electron"
-    },
-    "files": [
-      "dist/**/*",
-      "electron-dist/**/*",
-      "node_modules/**/*"
-    ],
-    "mac": {
-      "category": "public.app-category.productivity"
-    },
-    "win": {
-      "target": "portable",
-      "sign": false
-    },
-    "linux": {
-      "target": "AppImage"
-    }
   }
 }
