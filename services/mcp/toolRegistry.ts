@@ -101,6 +101,7 @@ export class MCPToolRegistry {
       'browser': ['navigate_to_url', 'click_element', 'fill_form_element', 'read_page_content', 'take_screenshot'],
       'search': ['google_search'],
       'automation': ['execute_javascript', 'create_plan'],
+      'forge': ['forge.mine_candidates', 'forge.propose_changes', 'forge.apply_changes'],
       'analysis': ['summarize_current_page'],
       'completion': ['task_completed'],
       'scraping': ['scrape_page', 'extract_data', 'parse_html'],

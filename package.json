@@ -18,7 +18,8 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "qa:forge": "tsx tools/qa/forge-smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",

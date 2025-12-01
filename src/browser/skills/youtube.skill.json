@@ -1,0 +1,71 @@
+{
+  "id": "youtube",
+  "selectors": [
+    {
+      "action": "add-or-update",
+      "name": "#menu-button",
+      "selector": "#menu-button",
+      "usageCount": 2,
+      "successRate": 0.5
+    },
+    {
+      "action": "add-or-update",
+      "name": "button#create",
+      "selector": "button#create",
+      "usageCount": 2,
+      "successRate": 0.5
+    }
+  ],
+  "workflows": [
+    {
+      "action": "add-or-update",
+      "name": "studio.youtube.com-workflow-shadow-1",
+      "description": "Learned from shadow flow shadow-1",
+      "steps": [
+        {
+          "action": "goto",
+          "target": "https://studio.youtube.com",
+          "success": true
+        },
+        {
+          "action": "click",
+          "target": "#menu-button",
+          "success": true
+        },
+        {
+          "action": "click",
+          "target": "button#create",
+          "success": true
+        }
+      ],
+      "successRate": 1,
+      "failurePatterns": []
+    },
+    {
+      "action": "add-or-update",
+      "name": "studio.youtube.com-workflow-shadow-2",
+      "description": "Learned from shadow flow shadow-2",
+      "steps": [
+        {
+          "action": "goto",
+          "target": "https://studio.youtube.com",
+          "success": true
+        },
+        {
+          "action": "click",
+          "target": "#menu-button",
+          "success": false
+        }
+      ],
+      "successRate": 0,
+      "failurePatterns": [
+        "shadow divergence"
+      ]
+    }
+  ],
+  "metadata": {
+    "generatedBy": "browser-forge",
+    "generatedAt": "2025-12-01T20:08:56.465Z"
+  },
+  "description": "Proposed skill updates for studio.youtube.com"
+}

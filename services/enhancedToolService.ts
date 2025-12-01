@@ -4,6 +4,10 @@ import { mcpManager } from './mcp/mcpManager';
 import { mcpToolRegistry } from './mcp/toolRegistry';
 import { mcpServerRouter } from './mcp/mcpServerRouter';
 import { configService } from './config';
+import { mineForgeCandidates } from '../src/browser/forge/forgeMiner';
+import { proposeSkillChanges } from '../src/browser/forge/forgeSynthesizer';
+import { applyForgeProposal } from '../src/browser/forge/forgeApplier';
+import { getForgeCandidate } from '../src/browser/forge/forgeState';
 
 export class EnhancedToolService {
   private executionHistory: Array<{ toolName: string; success: boolean; executionTime: number; timestamp: number }> = [];
@@ -123,7 +127,39 @@ export class EnhancedToolService {
       
       case 'task_completed':
         return await this.taskCompleted(args.summary as string);
-      
+
+      case 'forge.mine_candidates': {
+        const candidates = await mineForgeCandidates();
+        const filtered = args?.domain
+          ? candidates.filter(candidate => candidate.virtualDomain?.includes(args.domain))
+          : candidates;
+        return { success: true, data: filtered, message: `Found ${filtered.length} forge candidates` };
+      }
+
+      case 'forge.propose_changes': {
+        const candidateId = args?.candidateId as string;
+        const candidates = getForgeCandidate(candidateId) ? [] : await mineForgeCandidates();
+        const candidate = getForgeCandidate(candidateId) || candidates.find(c => c.id === candidateId);
+        if (!candidate) {
+          return { success: false, error: `Forge candidate ${candidateId} not found` };
+        }
+        const proposal = await proposeSkillChanges(candidate);
+        return { success: true, data: proposal, message: `Proposal ready for ${candidateId}` };
+      }
+
+      case 'forge.apply_changes': {
+        const candidateId = args?.candidateId as string;
+        const mode = (args?.mode as 'preview' | 'apply') || 'preview';
+        const candidates = getForgeCandidate(candidateId) ? [] : await mineForgeCandidates();
+        const candidate = getForgeCandidate(candidateId) || candidates.find(c => c.id === candidateId);
+        if (!candidate) {
+          return { success: false, error: `Forge candidate ${candidateId} not found` };
+        }
+        const proposal = await proposeSkillChanges(candidate);
+        const result = await applyForgeProposal(proposal, mode);
+        return { success: true, data: result, message: `Forge apply (${mode}) complete for ${candidateId}` };
+      }
+
       default:
         return {
           success: false,

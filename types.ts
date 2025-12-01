@@ -408,6 +408,39 @@ export const nativeTools: FunctionDeclaration[] = [
             properties: { summary: { type: Type.STRING, description: 'A summary of how the task was completed.' } },
             required: ['summary'],
         },
+    },
+    {
+        name: 'forge.mine_candidates',
+        description: 'Discover forge candidates mined from shadow mode and sentinel data. Optionally filter by domain.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                domain: { type: Type.STRING, description: 'Optional domain filter such as youtube or tiktok.' },
+            },
+        },
+    },
+    {
+        name: 'forge.propose_changes',
+        description: 'Generate a forge proposal for a given candidate id.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                candidateId: { type: Type.STRING, description: 'The forge candidate identifier.' },
+            },
+            required: ['candidateId'],
+        },
+    },
+    {
+        name: 'forge.apply_changes',
+        description: 'Preview or apply proposed forge skill changes for a candidate.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                candidateId: { type: Type.STRING, description: 'The forge candidate identifier.' },
+                mode: { type: Type.STRING, description: "Either 'preview' or 'apply'." },
+            },
+            required: ['candidateId'],
+        },
     }
 ];
 
