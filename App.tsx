@@ -33,7 +33,6 @@ const App: React.FC = () => {
     const [isHubOpen, setIsHubOpen] = useState(true);
     const [activeAiTab, setActiveAiTab] = useState('Chat');
     const [initializationStatus, setInitializationStatus] = useState<string>('Initializing...');
-    const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
     const browserViewRef = useRef<{
         clickElement: (tabId: number, elementId: string) => void;
@@ -43,11 +42,59 @@ const App: React.FC = () => {
 
     // Initialize the application only once
     useEffect(() => {
-        if (!isInitialized) {
-            initializeApp();
-            setIsInitialized(true);
-        }
-    }, [isInitialized]);
+        initializeApp();
+    }, []);
+
+    useEffect(() => {
+        // Keep UI state in sync with real browser events so actions work even in authenticated/desktop contexts.
+        const unsubscribes = [
+            aiBrowserBridge.onBrowserEvent('navigation', (event) => {
+                const { tabId, data } = event;
+                setTabs(prev => prev.map(tab => tab.browserViewId === tabId ? { ...tab, url: data?.url || tab.url, isLoading: true, lastActive: new Date() } : tab));
+            }),
+            aiBrowserBridge.onBrowserEvent('title_update', (event) => {
+                const { tabId, data } = event;
+                setTabs(prev => prev.map(tab => tab.browserViewId === tabId ? { ...tab, title: data?.title || tab.title, lastActive: new Date() } : tab));
+            }),
+            aiBrowserBridge.onBrowserEvent('page_load', async (event) => {
+                const { tabId } = event;
+                const context = aiBrowserBridge.createExecutionContext(tabId);
+                try {
+                    const content = await context.getPageContent();
+                    const mappedElements: InteractiveElement[] = (content?.elements || []).map((el: any) => ({
+                        id: el.handle || el.id || el.selector || `el-${Math.random().toString(36).slice(2)}`,
+                        tag: el.role || el.tag || 'element',
+                        attributes: el.attributes || { href: el.href || '', 'aria-label': el.attributes?.['aria-label'] || '', placeholder: el.attributes?.placeholder || '' },
+                        text: el.text || '',
+                    }));
+
+                    setTabs(prev => prev.map(tab =>
+                        tab.browserViewId === tabId
+                            ? {
+                                ...tab,
+                                url: content?.url || tab.url,
+                                title: content?.title || tab.title,
+                                pageContent: mappedElements,
+                                isLoading: false,
+                                lastActive: new Date(),
+                              }
+                            : tab
+                    ));
+                } catch (error) {
+                    console.warn('Failed to refresh page content after load:', error);
+                    setTabs(prev => prev.map(tab => tab.browserViewId === tabId ? { ...tab, isLoading: false, lastActive: new Date() } : tab));
+                }
+            }),
+            aiBrowserBridge.onBrowserEvent('error', (event) => {
+                const { tabId } = event;
+                setTabs(prev => prev.map(tab => tab.browserViewId === tabId ? { ...tab, isLoading: false, lastActive: new Date() } : tab));
+            }),
+        ];
+
+        return () => {
+            unsubscribes.forEach(unsub => unsub?.());
+        };
+    }, []);
 
     const initializeApp = async () => {
         try {
@@ -83,24 +130,16 @@ const App: React.FC = () => {
             console.log('✅ MCP servers will start on demand');
 
             setInitializationStatus('Creating initial tab...');
-            // Create a simple dummy tab for now to avoid browser view issues
-            setTabs([{
-                browserViewId: 'tab-1',
-                url: 'https://www.google.com',
-                title: 'New Tab',
-                favicon: '',
-                isLoading: false,
-            }]);
-            setActiveTabId('tab-1');
+            const initialTab = await aiBrowserBridge.createTab('1', 'https://www.google.com');
+            setTabs([initialTab]);
+            setActiveTabId(initialTab.browserViewId || initialTab.id.toString());
             console.log('✅ Initial tab created');
 
             setInitializationStatus('Ready');
-            setIsInitialized(true);
             console.log('✅ App initialization complete');
         } catch (error) {
             console.error('❌ Failed to initialize app:', error);
             setInitializationStatus(`Initialization failed: ${error.message}`);
-            setIsInitialized(true); // Set to true even on failure to prevent retries
         }
     };
 
@@ -291,36 +330,41 @@ const App: React.FC = () => {
     const handlePageUpdate = (tabId: number, url: string, title: string, content: InteractiveElement[], faviconUrl: string) => {
         setTabs(prevTabs =>
             prevTabs.map(tab =>
-                tab.id === tabId ? { ...tab, url, title, pageContent: content, faviconUrl } : tab
+                tab.id === tabId
+                    ? { ...tab, url, title, pageContent: content, faviconUrl, isLoading: false, lastActive: new Date() }
+                    : tab
             )
         );
     };
 
     const handleAddTab = async () => {
-        const newTabId = `tab-${Date.now()}`;
+        const newTabId = Date.now().toString();
         const newTab = await aiBrowserBridge.createTab(newTabId, 'https://www.google.com');
         setTabs([...tabs, newTab]);
-        setActiveTabId(newTabId);
+        setActiveTabId(newTab.browserViewId || newTab.id.toString());
     };
 
     const handleCloseTab = async (tabId: number) => {
         const tabIndex = tabs.findIndex(tab => tab.id === tabId);
+        const closingTab = tabs.find(tab => tab.id === tabId);
         const newTabs = tabs.filter(tab => tab.id !== tabId);
-        
+
         if (newTabs.length === 0) {
-            const newTabId = `tab-${Date.now()}`;
+            const newTabId = Date.now().toString();
             const newTab = await aiBrowserBridge.createTab(newTabId, 'https://www.google.com');
             setTabs([newTab]);
-            setActiveTabId(newTabId);
+            setActiveTabId(newTab.browserViewId || newTab.id.toString());
             return;
         }
 
         if (activeTabId === tabId.toString()) {
             const newActiveIndex = Math.max(0, tabIndex - 1);
-            setActiveTabId(newTabs[newActiveIndex].browserViewId || '');
+            setActiveTabId(newTabs[newActiveIndex].browserViewId || newTabs[newActiveIndex].id.toString());
         }
-        
-        await aiBrowserBridge.closeTab(tabId.toString());
+
+        if (closingTab) {
+            await aiBrowserBridge.closeTab(closingTab.browserViewId || tabId.toString());
+        }
         setTabs(newTabs);
     };
     
@@ -336,7 +380,7 @@ const App: React.FC = () => {
     };
     
     const handleNavigate = (url: string) => {
-        browserViewRef.current?.navigate(parseInt(activeTabId.replace('tab-', '')), url);
+        browserViewRef.current?.navigate(parseInt(activeTabId), url);
     };
 
     const handlePlanResponse = (plan: Plan, response: 'approve' | 'cancel' | 'retry' | 'update') => {
@@ -396,8 +440,8 @@ const App: React.FC = () => {
                 <BrowserView
                     ref={browserViewRef}
                     tabs={tabs}
-                    activeTabId={parseInt(activeTabId.replace('tab-', ''))}
-                    onTabChange={(tabId) => setActiveTabId(`tab-${tabId}`)}
+                    activeTabId={parseInt(activeTabId)}
+                    onTabChange={(tabId) => setActiveTabId(tabId.toString())}
                     onAddTab={handleAddTab}
                     onCloseTab={handleCloseTab}
                     onPageUpdate={handlePageUpdate}

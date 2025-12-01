@@ -1,6 +1,7 @@
 
 import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { Tab, InteractiveElement } from '../types';
+import { aiBrowserBridge } from '../services/aiBridge';
 import GlobeIcon from './icons/GlobeIcon';
 import BookmarkIcon from './icons/BookmarkIcon';
 import { bookmarkService } from '../services/bookmarkService';
@@ -19,6 +20,7 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
     const { tabs, activeTabId, onTabChange, onAddTab, onCloseTab, onPageUpdate, onBookmark } = props;
     const iframeRefs = useRef<{ [key: number]: HTMLIFrameElement | null }>({});
     const [urlInputValue, setUrlInputValue] = useState('');
+    const lastLoadedUrls = useRef<Record<number, string>>({});
 
     const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -73,6 +75,16 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
             iframe.srcdoc = `<html><body><h2>Failed to load page</h2><p>${(error as Error).message}</p></body></html>`;
         }
     }, []);
+
+    useEffect(() => {
+        tabs.forEach(tab => {
+            const lastUrl = lastLoadedUrls.current[tab.id];
+            if (tab.url && tab.url !== lastUrl) {
+                lastLoadedUrls.current[tab.id] = tab.url;
+                injectAndLoadContent(tab.id, tab.url);
+            }
+        });
+    }, [tabs, injectAndLoadContent]);
     
     const parseIframeContent = (tabId: number) => {
         const iframe = iframeRefs.current[tabId];
@@ -111,9 +123,18 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
     };
     
     // Fix: Define imperative methods as standalone functions to be callable from within the component and exposed via ref.
-    const navigate = useCallback((tabId: number, newUrl: string) => {
+    const navigate = useCallback(async (tabId: number, newUrl: string) => {
         const faviconUrl = getFaviconUrl(newUrl);
         onPageUpdate(tabId, newUrl, 'Loading...', [], faviconUrl);
+
+        // Use the desktop bridge when available so navigation happens in the real browser context (with cookies/login state).
+        try {
+            const context = aiBrowserBridge.createExecutionContext(tabId.toString());
+            await context.navigate(newUrl);
+        } catch (error) {
+            console.warn('Failed to delegate navigation to AI bridge, falling back to iframe-only navigation:', error);
+        }
+
         injectAndLoadContent(tabId, newUrl);
     }, [onPageUpdate, injectAndLoadContent]);
 
