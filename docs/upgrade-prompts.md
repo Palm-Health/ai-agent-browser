@@ -28,3 +28,6 @@ Establishes environment profiles, tenant scoping helpers, agent context injectio
 
 ## 9. Self-Healing Architecture
 Introduces health modeling, detection sensors, automated diagnosis and fixes, a learning healing memory, supervisor agent, UI dashboard, and MCP tools for monitoring and repair.
+
+For implementation details and validation steps, see `docs/dev/self-healing.md` and `docs/dev/shadow-mode.md` for the
+complementary Shadow Mode instrumentation that feeds observability and healing signals.

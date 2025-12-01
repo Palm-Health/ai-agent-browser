@@ -116,3 +116,16 @@ Describe in `docs/dev/shadow-mode.md` (this file):
 - How to enable/disable Shadow Mode.
 - How flows are learned and promoted to automations.
 - Recommended validation: run app, enable Shadow Mode, perform a short flow, end session, verify events/flows, compile a plan, and simulate it safely.
+
+---
+
+## Quickstart
+1. **Turn on Shadow Mode**: expose a toggle in the developer or agent menu. Activating it should return a `ShadowContext` with
+   the current user and session ID.
+2. **Perform a flow**: navigate the app normally (clicks, form entries, MCP tool invocations). Instrumented events are captured
+   only while Shadow Mode is active.
+3. **End session**: stop recording via the toggle or the `shadow.end_session` MCP tool to trigger flow learning.
+4. **Review learned flows**: open the Shadow page to inspect derived flows, rename/tag them, and choose a policy (Just Log,
+   Suggest Automation, Auto-Replay Allowed).
+5. **Compile and simulate**: use `shadow.compile_flow` to produce a browser plan, then run it in simulation/safe mode before
+   promoting it to an agent or scheduled automation.

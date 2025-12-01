@@ -90,3 +90,29 @@ Document in this file how to:
 - Run the supervisor agent.
 - Interpret reports and healing-memory insights.
 - Validate a full healing loop: detection → diagnosis → repair → retest → memory update.
+
+---
+
+## Quickstart
+1. **Enable sensors**: deploy the detection hooks for browser, MCP, Supabase, and marketing pipelines, then set any required
+   environment flags (for example, allow dev auto-migrations by leaving `ALLOW_PROD_HEALING` unset).
+2. **Seed health memory**: create the `healing_memory` table via migration so successful fixes can be persisted.
+3. **Run the supervisor**: trigger `healing.run_supervisor` (via MCP tool or scheduled job) to produce a `SystemHealthReport`
+   and attempt repairs.
+4. **Review fixes**: inspect logged auto-fix attempts, approve generated patches, and rerun the failing scenario with the
+   retester.
+5. **Verify the loop**: confirm that issues move from `broken` → `healthy`, and that recurring issues reuse the stored
+   `fix_signature` from healing memory.
+
+---
+
+## Example Flow: Detection → Diagnosis → Repair → Retest → Memory
+1. **Detection**: a browser selector fails repeatedly; the browser sensor records a `HealthIssue` with component `browser` and
+   symptom `selector not found`.
+2. **Diagnosis**: `diagnoseIssue` inspects DOM context, tags probable causes like "DOM updated" and recommends rebuilding the
+   selector.
+3. **Auto-repair**: `attemptAutoFix` regenerates a resilient selector, patches the stored flow, and marks `autoFixAttempted`.
+4. **Retest**: `revalidateIssue` reruns the flow step; if successful, it flags `autoFixSuccessful` and updates the
+   `SystemHealthReport`.
+5. **Memory update**: the successful repair is hashed into `healing_memory` so future similar selector failures immediately
+   reuse the proven fix.
