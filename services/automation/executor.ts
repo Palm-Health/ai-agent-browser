@@ -1,7 +1,12 @@
 import { Action, Plan, PlanResult, ActionResult, PermissionService, AIBrowserBridge } from './actions';
+import { PageContext } from '../vaultProtocol';
 
 export class ActionExecutor {
-  constructor(private bridge: AIBrowserBridge, private perms: PermissionService) {}
+  constructor(
+    private bridge: AIBrowserBridge,
+    private perms: PermissionService,
+    private pageContextResolver?: (tabId: string) => PageContext | undefined,
+  ) {}
 
   async runPlan(tabId: string, plan: Plan, signal?: AbortSignal): Promise<PlanResult> {
     const started = performance.now();
@@ -27,6 +32,9 @@ export class ActionExecutor {
   private async execOne(tabId: string, a: Action): Promise<ActionResult> {
     switch (a.kind) {
       case 'navigate':
+        if (this.pageContextResolver?.(tabId)?.isVaultSnapshot) {
+          return { ok:true, code:'SNAPSHOT_NAVIGATION_SKIPPED', meta:{ url: a.url } };
+        }
         await this.perms.require('navigate_to_url', { tabId });
         await this.bridge.navigateTo(tabId, a.url);
         return { ok:true };

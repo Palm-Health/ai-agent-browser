@@ -54,6 +54,7 @@ pids/
 *.pid
 *.seed
 *.pid.lock
+PalmVault/
 
 # Coverage directory used by tools like istanbul
 coverage/

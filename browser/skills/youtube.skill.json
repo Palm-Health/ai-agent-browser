@@ -1,0 +1,17 @@
+{
+  "id": "youtube",
+  "domain": ["youtube.com", "studio.youtube.com"],
+  "selectors": {
+    "analyticsButton": "#analytics-button",
+    "overviewTab": "#analytics-overview"
+  },
+  "workflows": {
+    "openAnalytics": [
+      { "action": "goto", "url": "https://studio.youtube.com", "description": "Navigate to Studio" },
+      { "action": "waitForSelector", "selector": "#analytics-button", "description": "Wait for analytics button" },
+      { "action": "click", "selector": "#analytics-button", "description": "Open analytics" },
+      { "action": "waitForSelector", "selector": "#analytics-overview", "description": "Load overview" },
+      { "action": "extractText", "selector": "#analytics-overview", "description": "Read overview" }
+    ]
+  }
+}
