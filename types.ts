@@ -401,6 +401,52 @@ export const nativeTools: FunctionDeclaration[] = [
         parameters: { type: Type.OBJECT, properties: {} },
     },
     {
+        name: 'orchestrator.plan',
+        description: 'Generate a mission plan for a high-level goal across agents.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: 'Mission identifier' },
+                userId: { type: Type.STRING, description: 'Requesting user identifier' },
+                type: { type: Type.STRING, description: 'Mission type key' },
+                goal: { type: Type.STRING, description: 'Natural language mission intent' },
+                brandId: { type: Type.STRING, description: 'Optional brand ID' },
+                practiceId: { type: Type.STRING, description: 'Optional practice ID' },
+                constraints: { type: Type.OBJECT, description: 'Constraint object' },
+                context: { type: Type.OBJECT, description: 'Prebuilt mission context' },
+            },
+            required: ['id', 'userId', 'type', 'goal'],
+        },
+    },
+    {
+        name: 'orchestrator.run',
+        description: 'Plan and execute a mission, returning results.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: 'Mission identifier' },
+                userId: { type: Type.STRING, description: 'Requesting user identifier' },
+                type: { type: Type.STRING, description: 'Mission type key' },
+                goal: { type: Type.STRING, description: 'Natural language mission intent' },
+                brandId: { type: Type.STRING, description: 'Optional brand ID' },
+                practiceId: { type: Type.STRING, description: 'Optional practice ID' },
+                constraints: { type: Type.OBJECT, description: 'Constraint object' },
+                context: { type: Type.OBJECT, description: 'Prebuilt mission context' },
+            },
+            required: ['id', 'userId', 'type', 'goal'],
+        },
+    },
+    {
+        name: 'orchestrator.status',
+        description: 'Return recent mission status, logs, and outcomes.',
+        parameters: { type: Type.OBJECT, properties: {} },
+    },
+    {
+        name: 'orchestrator.list_missions',
+        description: 'List predefined mission templates and metadata.',
+        parameters: { type: Type.OBJECT, properties: {} },
+    },
+    {
         name: 'task_completed',
         description: 'Call this function when you have fully completed the user\'s request.',
         parameters: {
