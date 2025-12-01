@@ -408,6 +408,50 @@ export const nativeTools: FunctionDeclaration[] = [
             properties: { summary: { type: Type.STRING, description: 'A summary of how the task was completed.' } },
             required: ['summary'],
         },
+    },
+    {
+        name: 'vault.list_pages',
+        description: 'List saved vault snapshots with optional tag or mission filters.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                tag: { type: Type.STRING, description: 'Optional tag to filter snapshots.' },
+                missionId: { type: Type.STRING, description: 'Optional mission identifier to filter snapshots.' },
+            },
+        },
+    },
+    {
+        name: 'vault.get_page',
+        description: 'Fetch the HTML for a saved vault snapshot by ID.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: 'Snapshot identifier.' },
+            },
+            required: ['id'],
+        },
+    },
+    {
+        name: 'vault.get_markdown',
+        description: 'Fetch the markdown representation for a vault snapshot by ID.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                id: { type: Type.STRING, description: 'Snapshot identifier.' },
+            },
+            required: ['id'],
+        },
+    },
+    {
+        name: 'vault.search',
+        description: 'Search vault snapshots by keywords across title, URL, and tags.',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                query: { type: Type.STRING, description: 'Search phrase to match against saved snapshots.' },
+            },
+            required: ['query'],
+        },
     }
 ];
 

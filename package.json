@@ -18,6 +18,7 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
+    "vault:smoke": "TS_NODE_TRANSPILE_ONLY=1 ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' scripts/vaultSmoke.ts",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {

@@ -3,6 +3,7 @@ import type { FunctionCall } from "@google/genai";
 import { ExecutionContext, ToolResult } from "../types";
 // Fix: Using relative path to import geminiService.
 import { geminiService } from "./geminiService";
+import { getSnapshotHTML, getSnapshotMarkdown, listSnapshots } from "../src/browser/vault/vaultService";
 
 export class ToolService {
     async executeTool(functionCall: FunctionCall, context: ExecutionContext): Promise<ToolResult> {
@@ -74,10 +75,42 @@ export class ToolService {
                     const errorMessage = `An error occurred while trying to summarize the page. This could be due to a network issue or a problem with the CORS proxy. Error: ${error.message}`;
                     return { success: false, message: errorMessage };
                 }
-            
+
             case 'task_completed':
                 const summary = args['summary'] as string;
                 return { success: true, message: `Task Completed: ${summary}` };
+
+            case 'vault.list_pages': {
+                const tag = args['tag'] as string | undefined;
+                const missionId = args['missionId'] as string | undefined;
+                const entries = await listSnapshots({ tag, missionId });
+                return { success: true, content: entries };
+            }
+
+            case 'vault.get_page': {
+                const id = args['id'] as string;
+                const html = await getSnapshotHTML(id);
+                if (!html) return { success: false, message: 'Snapshot not found' };
+                return { success: true, content: { id, html } };
+            }
+
+            case 'vault.get_markdown': {
+                const id = args['id'] as string;
+                const markdown = await getSnapshotMarkdown(id);
+                if (!markdown) return { success: false, message: 'Snapshot not found' };
+                return { success: true, content: { id, markdown } };
+            }
+
+            case 'vault.search': {
+                const query = (args['query'] as string)?.toLowerCase() || '';
+                const entries = await listSnapshots();
+                const matches = entries.filter((entry) =>
+                    entry.title.toLowerCase().includes(query) ||
+                    entry.url.toLowerCase().includes(query) ||
+                    entry.tags.some(tag => tag.toLowerCase().includes(query))
+                );
+                return { success: true, content: matches };
+            }
 
             default:
                 return { success: false, message: `Tool '${name}' not found.` };
