@@ -18,6 +18,7 @@ export * from './policy';
 export * from './reflection';
 export * from './memory';
 export * from './telemetry';
+export * from './forgeMission';
 
 // Examples and utilities
 export * from './examples';
