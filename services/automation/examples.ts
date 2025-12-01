@@ -6,9 +6,15 @@
  * safety features like permissions, timeouts, retries, and cancellation.
  */
 
+import os from 'node:os';
+import path from 'node:path';
+
 import { Action, Plan, ActionExecutor, PermissionService, AIBrowserBridge } from './actions';
 import { ActionExecutor as ExecutorClass } from './executor';
 import { aiBrowserBridge } from '../aiBridge';
+
+const tempDir = os.tmpdir();
+const tmpPath = (fileName: string) => path.join(tempDir, fileName);
 
 // Example 1: Simple form filling automation
 export function createFormFillingPlan(): Plan {
@@ -23,7 +29,7 @@ export function createFormFillingPlan(): Plan {
       { kind: 'type', handle: 'h_message_textarea', text: 'Hello, I would like to inquire about...', replace: true },
       { kind: 'click', handle: 'h_submit_button' },
       { kind: 'waitFor', selector: '.success-message', timeoutMs: 10000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/form-submission-success.png' }
+      { kind: 'screenshot', fullPage: true, path: tmpPath('form-submission-success.png') }
     ],
     budgetMs: 60000, // 1 minute total budget
     budgetOps: 20    // Maximum 20 operations
@@ -50,7 +56,7 @@ export function createCheckoutPlan(): Plan {
       { kind: 'type', handle: 'h_zip', text: '12345', replace: true },
       { kind: 'click', handle: 'h_continue_payment' },
       { kind: 'waitFor', selector: '.payment-section', timeoutMs: 5000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/checkout-form-filled.png' }
+      { kind: 'screenshot', fullPage: true, path: tmpPath('checkout-form-filled.png') }
     ],
     budgetMs: 120000, // 2 minutes total budget
     budgetOps: 30     // Maximum 30 operations
@@ -64,12 +70,12 @@ export function createDataScrapingPlan(): Plan {
     steps: [
       { kind: 'navigate', url: 'https://news.example.com', timeoutMs: 15000 },
       { kind: 'waitFor', selector: '.article-list', timeoutMs: 10000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/news-homepage.png' },
+      { kind: 'screenshot', fullPage: true, path: tmpPath('news-homepage.png') },
       { kind: 'click', handle: 'h_first_article' },
       { kind: 'waitFor', selector: '.article-content', timeoutMs: 10000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/first-article.png' },
+      { kind: 'screenshot', fullPage: true, path: tmpPath('first-article.png') },
       { kind: 'scrollIntoView', handle: 'h_article_footer' },
-      { kind: 'screenshot', fullPage: false, path: '/tmp/article-footer.png' }
+      { kind: 'screenshot', fullPage: false, path: tmpPath('article-footer.png') }
     ],
     budgetMs: 90000,  // 1.5 minutes total budget
     budgetOps: 15     // Maximum 15 operations
@@ -92,7 +98,7 @@ export function createRobustWorkflowPlan(): Plan {
       
       // Step 3: Wait for dashboard and verify login success
       { kind: 'waitFor', selector: '.dashboard', timeoutMs: 15000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/dashboard-loaded.png' },
+      { kind: 'screenshot', fullPage: true, path: tmpPath('dashboard-loaded.png') },
       
       // Step 4: Navigate to specific feature
       { kind: 'click', handle: 'h_reports_menu' },
@@ -104,7 +110,7 @@ export function createRobustWorkflowPlan(): Plan {
       { kind: 'select', handle: 'h_report_period', value: 'last-month' },
       { kind: 'click', handle: 'h_generate_button' },
       { kind: 'waitFor', selector: '.download-ready', timeoutMs: 30000 },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/report-generated.png' }
+      { kind: 'screenshot', fullPage: true, path: tmpPath('report-generated.png') }
     ],
     budgetMs: 300000, // 5 minutes total budget
     budgetOps: 50     // Maximum 50 operations

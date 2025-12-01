@@ -18,6 +18,14 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
+    "agent:check": "tsx tools/agent-check.ts",
+    "ffmpeg:check": "tsx tools/ffmpeg-check.ts",
+    "playwright:install": "npx playwright@1.40.0 install chromium",
+    "browser:analyze": "tsx tools/browser/analyze.ts",
+    "browser:plan": "tsx tools/browser/plan.ts",
+    "browser:run": "tsx tools/browser/run.ts",
+    "marketing:campaign": "tsx tools/marketing/run-campaign.ts",
+    "marketing:episode": "tsx tools/marketing/plan-episode.ts",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
