@@ -18,6 +18,7 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
+    "agent": "tsx tools/agent-cli.ts",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
