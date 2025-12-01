@@ -1,7 +1,8 @@
-import { readFile, readdir } from 'fs/promises';
+import { access, constants, readFile, readdir } from 'fs/promises';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import {
+  DomainSkillMatch,
   LoadedPlugin,
   PluginContext,
   PluginEntry,
@@ -9,11 +10,13 @@ import {
   PluginManifest,
   PluginModule,
   PluginPermission,
+  SkillPackDefinition,
 } from './pluginTypes';
 
 export class PluginLoader {
   private plugins = new Map<string, LoadedPlugin>();
   private domainIndex = new Map<string, Set<string>>();
+  private skillIndex = new Map<string, DomainSkillBucket>();
   private readonly allowedPermissions: PluginPermission[];
   private readonly pluginDirectory?: string;
   private readonly browserApi?: PluginLoaderOptions['browserApi'];
@@ -40,7 +43,7 @@ export class PluginLoader {
 
     const loaded: LoadedPlugin = { manifest, entry, status: 'loaded' };
     this.plugins.set(manifest.id, loaded);
-    this.indexDomains(manifest);
+    this.indexDomains(manifest, entry);
 
     await entry.hooks.activate?.();
     return loaded;
@@ -59,7 +62,9 @@ export class PluginLoader {
 
       if (entry.isDirectory()) {
         const nestedManifest = path.join(directory, entry.name, 'manifest.json');
-        manifests.push(nestedManifest);
+        if (await this.fileExists(nestedManifest)) {
+          manifests.push(nestedManifest);
+        }
       }
     }
 
@@ -94,18 +99,9 @@ export class PluginLoader {
     return this.plugins.get(id);
   }
 
-  getSkillPacksForDomain(domain: string): PluginEntry[] {
-    const pluginIds = this.domainIndex.get(domain) ?? new Set<string>();
-    const matches: PluginEntry[] = [];
-
-    for (const pluginId of pluginIds) {
-      const plugin = this.plugins.get(pluginId);
-      if (plugin?.entry.skills) {
-        matches.push(plugin.entry);
-      }
-    }
-
-    return matches;
+  getSkillPacksForDomain(domain: string): DomainSkillMatch[] {
+    const matchedSkills = this.findSkillPacksForHostname(domain);
+    return matchedSkills;
   }
 
   async notifyNavigation(url: string): Promise<void> {
@@ -131,6 +127,9 @@ export class PluginLoader {
     if (!manifest.id) errors.push('Missing id');
     if (!manifest.name) errors.push('Missing name');
     if (!manifest.entry) errors.push('Missing entry');
+    if (manifest.entry && typeof manifest.entry !== 'string') {
+      errors.push('entry must be a string path');
+    }
     if (!Array.isArray(manifest.permissions)) errors.push('Missing permissions');
 
     if (manifest.domains && !Array.isArray(manifest.domains)) {
@@ -179,14 +178,36 @@ export class PluginLoader {
     };
   }
 
-  private indexDomains(manifest: PluginManifest): void {
-    if (!manifest.domains) return;
-
-    for (const domain of manifest.domains) {
-      if (!this.domainIndex.has(domain)) {
-        this.domainIndex.set(domain, new Set());
+  private indexDomains(manifest: PluginManifest, entry: PluginEntry): void {
+    if (manifest.domains) {
+      for (const domain of manifest.domains) {
+        if (!this.domainIndex.has(domain)) {
+          this.domainIndex.set(domain, new Set());
+        }
+        this.domainIndex.get(domain)!.add(manifest.id);
       }
-      this.domainIndex.get(domain)!.add(manifest.id);
+    }
+
+    if (entry.skills) {
+      for (const skill of entry.skills) {
+        if (!skill.domain) continue;
+
+        if (!this.skillIndex.has(skill.domain)) {
+          this.skillIndex.set(skill.domain, { domain: skill.domain, skills: [] });
+        }
+
+        this.skillIndex.get(skill.domain)!.skills.push({
+          pluginId: manifest.id,
+          pluginName: manifest.name,
+          manifest,
+          skill,
+        });
+
+        if (!this.domainIndex.has(skill.domain)) {
+          this.domainIndex.set(skill.domain, new Set());
+        }
+        this.domainIndex.get(skill.domain)!.add(manifest.id);
+      }
     }
   }
 
@@ -215,4 +236,51 @@ export class PluginLoader {
 
     return Array.from(matching.values());
   }
+
+  private findSkillPacksForHostname(hostname: string): DomainSkillMatch[] {
+    const matchesByPlugin = new Map<string, DomainSkillBucket>();
+
+    for (const bucket of this.skillIndex.values()) {
+      if (hostname === bucket.domain || hostname.endsWith(`.${bucket.domain}`)) {
+        for (const entry of bucket.skills) {
+          if (!matchesByPlugin.has(entry.pluginId)) {
+            matchesByPlugin.set(entry.pluginId, {
+              domain: bucket.domain,
+              skills: [],
+            });
+          }
+
+          matchesByPlugin.get(entry.pluginId)!.skills.push(entry);
+        }
+      }
+    }
+
+    return Array.from(matchesByPlugin.values()).map(bucket => ({
+      pluginId: bucket.skills[0]?.pluginId ?? '',
+      pluginName: bucket.skills[0]?.pluginName ?? '',
+      manifest: bucket.skills[0]?.manifest!,
+      skills: bucket.skills.map(entry => entry.skill),
+    }));
+  }
+
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await access(filePath, constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+interface DomainSkillBucket {
+  domain: string;
+  skills: DomainSkillEntry[];
+}
+
+interface DomainSkillEntry {
+  pluginId: string;
+  pluginName: string;
+  manifest: PluginManifest;
+  skill: SkillPackDefinition;
 }

@@ -79,6 +79,13 @@ export interface PluginEntry {
   skills?: SkillPackDefinition[];
 }
 
+export interface DomainSkillMatch {
+  pluginId: string;
+  pluginName: string;
+  manifest: PluginManifest;
+  skills: SkillPackDefinition[];
+}
+
 export interface PluginModule {
   createPlugin: (context: PluginContext) => PluginEntry | Promise<PluginEntry>;
 }
