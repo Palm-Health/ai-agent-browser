@@ -18,7 +18,9 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "agent": "ts-node tools/agent-cli.ts",
+    "agent:parallel": "ts-node tools/agent-parallel-cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
