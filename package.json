@@ -2,6 +2,7 @@
   "name": "ai-agent-browser",
   "private": true,
   "version": "1.0.0",
+  "type": "module",
   "description": "AI Agent Browser - Model-Agnostic with MCP Integration",
   "author": "AI Agent Browser Team",
   "main": "electron-dist/main.js",
