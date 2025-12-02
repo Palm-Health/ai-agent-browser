@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxrandr2 \
   libgbm1 \
   libxkbcommon0 \
-  libasound2t64 \
+  libasound2 \
   libatspi2.0-0 \
   libgdk-pixbuf2.0-0 \
   libnss3 \
