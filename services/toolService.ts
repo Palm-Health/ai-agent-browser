@@ -69,9 +69,10 @@ export class ToolService {
                     
                     return { success: true, summary: summary };
 
-                } catch (error: any) {
+                } catch (error) {
                     console.error("Summarization error:", error);
-                    const errorMessage = `An error occurred while trying to summarize the page. This could be due to a network issue or a problem with the CORS proxy. Error: ${error.message}`;
+                    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+                    const errorMessage = `An error occurred while trying to summarize the page. This could be due to a network issue or a problem with the CORS proxy. Error: ${errorMsg}`;
                     return { success: false, message: errorMessage };
                 }
             

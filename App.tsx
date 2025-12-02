@@ -45,7 +45,6 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!isInitialized) {
             initializeApp();
-            setIsInitialized(true);
         }
     }, [isInitialized]);
 
@@ -99,7 +98,8 @@ const App: React.FC = () => {
             console.log('✅ App initialization complete');
         } catch (error) {
             console.error('❌ Failed to initialize app:', error);
-            setInitializationStatus(`Initialization failed: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            setInitializationStatus(`Initialization failed: ${errorMessage}`);
             setIsInitialized(true); // Set to true even on failure to prevent retries
         }
     };
@@ -238,7 +238,7 @@ const App: React.FC = () => {
             const memories = memoryService.getMemories();
             
             // Add timeout wrapper for better error handling
-            const result = await Promise.race([
+            const response = await Promise.race([
                 modelRouter.executeWithFallback(
                     [...messages, { type: 'user', text: message, id: Date.now() }],
                     allTools
@@ -246,35 +246,35 @@ const App: React.FC = () => {
                 new Promise((_, reject) => 
                     setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
                 )
-            ]);
+            ]) as { model: any; result: any };
 
-            console.log(`Using model: ${result.model.name} for task`);
+            console.log(`Using model: ${response.model.name} for task`);
 
-            if (result.functionCalls && result.functionCalls[0]?.name === 'create_plan') {
-                const planArgs = result.functionCalls[0].args as { steps: { functionCall: any }[] };
+            if (response.result.functionCalls && response.result.functionCalls[0]?.name === 'create_plan') {
+                const planArgs = response.result.functionCalls[0].args as { steps: { functionCall: any }[] };
                 const newPlan: Plan = {
                     id: Date.now(),
                     objective: message,
                     steps: planArgs.steps.map(step => ({ functionCall: step.functionCall, status: 'pending' })),
                     status: 'awaiting_approval',
-                    modelUsed: result.model.name,
+                    modelUsed: response.model.name,
                 };
                 addMessage({ type: 'plan', plan: newPlan } as ChatMessage);
                 setIsLoading(false);
-            } else if (result.functionCalls) {
+            } else if (response.result.functionCalls) {
                 // Handle single-step function calls directly
                 const context = aiBrowserBridge.createExecutionContext(activeTabId);
-                const toolResult = await enhancedToolService.executeTool(result.functionCalls[0], context);
+                const toolResult = await enhancedToolService.executeTool(response.result.functionCalls[0], context);
                 addMessage({ type: 'tool_result', toolResult } as ChatMessage);
                 
                 if (toolResult.success) {
-                    addMessage({ type: 'agent', text: `Task completed successfully using ${result.model.name}` } as ChatMessage);
+                    addMessage({ type: 'agent', text: `Task completed successfully using ${response.model.name}` } as ChatMessage);
                 } else {
                     addMessage({ type: 'agent', text: `Task failed: ${toolResult.error}` } as ChatMessage);
                 }
                 setIsLoading(false);
             } else {
-                if (result.text) addMessage({ type: 'agent', text: result.text } as ChatMessage);
+                if (response.result.text) addMessage({ type: 'agent', text: response.result.text } as ChatMessage);
                 setIsLoading(false);
             }
         } catch (error) {

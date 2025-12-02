@@ -280,7 +280,7 @@ export class AIBrowserBridge {
         const result = await window.electronAPI.setActiveBrowserView(tabId);
         
         // Check if Electron API returns success indicator
-        if (result && typeof result === 'object' && 'success' in result && !result.success) {
+        if (!result) {
           throw new BridgeError('ELECTRON_FAIL', 'Failed to activate tab in Electron', { tabId, op: 'setActiveTab' });
         }
       }
@@ -603,25 +603,27 @@ export class AIBrowserBridge {
         
         // T9: Normalize to base64 PNG format
         // Handle both base64 string and Buffer responses
-        if (typeof result.image === 'string') {
+        const imageData = result.image;
+        if (typeof imageData === 'string') {
           // Already base64, ensure it has data URI prefix
-          if (result.image.startsWith('data:image/png;base64,')) {
-            return result.image;
-          } else if (result.image.startsWith('data:')) {
-            return result.image; // Other data URI format
+          if (imageData.startsWith('data:image/png;base64,')) {
+            return imageData;
+          } else if (imageData.startsWith('data:')) {
+            return imageData; // Other data URI format
           } else {
             // Raw base64 string, add prefix
-            return `data:image/png;base64,${result.image}`;
+            return `data:image/png;base64,${imageData}`;
           }
-        } else if (result.image instanceof Buffer || result.image instanceof Uint8Array) {
+        } else if (imageData && (imageData instanceof Buffer || imageData instanceof Uint8Array)) {
           // Convert Buffer to base64
-          const base64 = Buffer.from(result.image).toString('base64');
+          const base64 = Buffer.from(imageData).toString('base64');
           return `data:image/png;base64,${base64}`;
         } else if (result.base64Png) {
           // Use explicit base64Png field if available
-          return result.base64Png.startsWith('data:') 
-            ? result.base64Png 
-            : `data:image/png;base64,${result.base64Png}`;
+          const base64Png = result.base64Png;
+          return base64Png.startsWith('data:') 
+            ? base64Png 
+            : `data:image/png;base64,${base64Png}`;
         }
         
         throw new BridgeError('SCREENSHOT_INVALID_FORMAT', 'Screenshot returned in unexpected format', { tabId, op: 'screenshot' });
@@ -936,7 +938,7 @@ export class AIBrowserBridge {
 
   private async performClickHandle(tabId: string, handle: string): Promise<ActionResult> {
     try {
-      if (this.isElectron) {
+      if (this.isElectron && window.electronAPI.clickHandle) {
         const result = await window.electronAPI.clickHandle(tabId, handle);
         if (!result.success) {
           return { ok: false, code: result.error || 'CLICK_FAILED' };
@@ -970,7 +972,7 @@ export class AIBrowserBridge {
 
   private async performTypeInto(tabId: string, handle: string, text: string, replace: boolean, delayMs: number): Promise<ActionResult> {
     try {
-      if (this.isElectron) {
+      if (this.isElectron && window.electronAPI.typeInto) {
         const result = await window.electronAPI.typeInto(tabId, handle, text, replace, delayMs);
         if (!result.success) {
           return { ok: false, code: result.error || 'TYPE_FAILED' };
@@ -1004,7 +1006,7 @@ export class AIBrowserBridge {
 
   private async performSelectOption(tabId: string, handle: string, value: string): Promise<ActionResult> {
     try {
-      if (this.isElectron) {
+      if (this.isElectron && window.electronAPI.selectOption) {
         const result = await window.electronAPI.selectOption(tabId, handle, value);
         if (!result.success) {
           return { ok: false, code: result.error || 'SELECT_FAILED' };
@@ -1038,8 +1040,8 @@ export class AIBrowserBridge {
 
   private async performWaitFor(tabId: string, selector?: string, handle?: string): Promise<ActionResult> {
     try {
-      if (this.isElectron) {
-        const result = await window.electronAPI.waitFor(tabId, selector, handle);
+      if (this.isElectron && window.electronAPI.waitFor) {
+        const result = await window.electronAPI.waitFor(tabId, { selector, handle });
         if (!result.success) {
           return { ok: false, code: result.error || 'WAIT_FAILED' };
         }
@@ -1072,7 +1074,7 @@ export class AIBrowserBridge {
 
   private async performScrollIntoView(tabId: string, handle: string): Promise<ActionResult> {
     try {
-      if (this.isElectron) {
+      if (this.isElectron && window.electronAPI.scrollIntoView) {
         const result = await window.electronAPI.scrollIntoView(tabId, handle);
         if (!result.success) {
           return { ok: false, code: result.error || 'SCROLL_FAILED' };
@@ -1106,7 +1108,7 @@ export class AIBrowserBridge {
 
   private async performSaveFile(mimeType: string, data: string, path: string): Promise<void> {
     try {
-      if (this.isElectron) {
+      if (this.isElectron && window.electronAPI.saveFile) {
         const result = await window.electronAPI.saveFile(mimeType, data, path);
         if (!result.success) {
           throw new BridgeError('SAVE_FILE_FAILED', result.error || 'Unknown save file error', { path, op: 'saveFile' });
