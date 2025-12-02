@@ -439,7 +439,7 @@ declare global {
       clickHandle?: (tabId: string, handle: string) => Promise<{ success: boolean; error?: string }>;
       typeInto?: (tabId: string, handle: string, text: string, replace: boolean, delayMs: number) => Promise<{ success: boolean; error?: string }>;
       selectOption?: (tabId: string, handle: string, option: string) => Promise<{ success: boolean; error?: string }>;
-      waitFor?: (tabId: string, condition: any) => Promise<{ success: boolean; error?: string }>;
+      waitFor?: (tabId: string, condition: { selector?: string; handle?: string }) => Promise<{ success: boolean; error?: string }>;
       scrollIntoView?: (tabId: string, handle: string) => Promise<{ success: boolean; error?: string }>;
       saveFile?: (mimeType: string, data: string, path: string) => Promise<{ success: boolean; error?: string }>;
     };
