@@ -134,6 +134,8 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
         },
+        // NOTE: The following MCP servers require API keys to be set via environment variables.
+        // See .env.example for the required variables.
         {
           id: 'brave-search',
           name: 'Brave Search Server',
@@ -144,7 +146,7 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            BRAVE_API_KEY: 'BSAzvC8r3dd_OekldjQNh_L0cs1m6LM'
+            BRAVE_API_KEY: process.env.BRAVE_API_KEY || ''
           }
         },
         {
@@ -157,7 +159,7 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            GITHUB_PERSONAL_ACCESS_TOKEN: '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'
+            GITHUB_PERSONAL_ACCESS_TOKEN: process.env.GITHUB_PERSONAL_ACCESS_TOKEN || ''
           }
         },
         {
@@ -170,8 +172,8 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            PUPPETEER_HEADLESS: 'false',
-            PUPPETEER_USER_DATA_DIR: 'C:/Users/Owner/AppData/Local/puppeteer-profile'
+            PUPPETEER_HEADLESS: process.env.PUPPETEER_HEADLESS || 'true',
+            PUPPETEER_USER_DATA_DIR: process.env.PUPPETEER_USER_DATA_DIR || ''
           }
         },
         {
@@ -179,7 +181,7 @@ export class ConfigService {
           name: 'GitKraken Server',
           type: 'local',
           command: 'node',
-          args: ['C:/Users/Owner/AppData/Roaming/npm/node_modules/@gitkraken/mcp-server-gitkraken/dist/index.js'],
+          args: [process.env.GITKRAKEN_MCP_PATH || './node_modules/@gitkraken/mcp-server-gitkraken/dist/index.js'],
           autoStart: false,
           timeout: 30000,
           retries: 3,
@@ -194,7 +196,7 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            API_KEY: 'sk-2slides-f0c3b5516c41563c36ef5f408ade679752724cd78becc2edb12b4eeb4773c98aEY'
+            API_KEY: process.env.TWOSLIDES_API_KEY || ''
           }
         },
         {
@@ -207,7 +209,7 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            API_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OGYzYjhjNDFiMmIyZjkyNzc4YWEyYTYiLCJlbWFpbCI6Im4wMTUwODU4M0B1bmYuZWR1IiwidHlwZSI6ImFwaSIsImlhdCI6MTc2MDgwMzAxMn0.mPElLcKmM5ZwHlhGsuZfSac02-Ojl4BpaUy_RaUnlGg'
+            API_KEY: process.env.ENDGAME_API_KEY || ''
           }
         },
         {
@@ -220,21 +222,21 @@ export class ConfigService {
           timeout: 30000,
           retries: 3,
           env: {
-            TG_APP_ID: '22314120',
-            TG_API_HASH: '4a8bba2b92dd75e05bc6c02927a8054f'
+            TG_APP_ID: process.env.TG_APP_ID || '',
+            TG_API_HASH: process.env.TG_API_HASH || ''
           }
         },
         {
           id: 'pubmed',
           name: 'PubMed Server',
           type: 'local',
-          command: 'C:\\Python314\\python.exe',
+          command: process.env.PYTHON_PATH || 'python',
           args: ['-m', 'mcp_simple_pubmed'],
           autoStart: false,
           timeout: 30000,
           retries: 3,
           env: {
-            PUBMED_EMAIL: 'your-email@example.com'
+            PUBMED_EMAIL: process.env.PUBMED_EMAIL || ''
           }
         },
         {
@@ -242,13 +244,13 @@ export class ConfigService {
           name: 'AgentCare Server',
           type: 'local',
           command: 'node',
-          args: ['D:\\GitHub\\agentcare-mcp\\build\\index.js'],
-          autoStart: false, // Disabled as per your config
+          args: [process.env.AGENTCARE_MCP_PATH || './mcp-servers/agentcare/index.js'],
+          autoStart: false,
           timeout: 30000,
           retries: 3,
           env: {
-            OAUTH_CLIENT_ID: 'your-client-id-when-ready',
-            FHIR_BASE_URL: 'your-optimantra-url'
+            OAUTH_CLIENT_ID: process.env.AGENTCARE_OAUTH_CLIENT_ID || '',
+            FHIR_BASE_URL: process.env.AGENTCARE_FHIR_BASE_URL || ''
           }
         },
         {
@@ -256,7 +258,7 @@ export class ConfigService {
           name: 'Unreal Engine MCP Server',
           type: 'local',
           command: 'uv',
-          args: ['--directory', 'D:\\GitHub\\unreal-engine-mcp#\\Python', 'run', 'unreal_mcp_server_advanced.py'],
+          args: ['--directory', process.env.UNREAL_MCP_PATH || './mcp-servers/unreal-engine', 'run', 'unreal_mcp_server_advanced.py'],
           autoStart: false,
           timeout: 30000,
           retries: 3,

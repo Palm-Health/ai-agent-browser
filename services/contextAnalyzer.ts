@@ -124,6 +124,18 @@ export function detectTimeConstraint(text: string): TimeConstraint {
   return 'unspecified';
 }
 
+// Export PrivacyLevel type for intelligentRouter
+export type PrivacyLevel = 'strict' | 'moderate' | 'relaxed';
+
+// Export SystemContext interface for intelligentRouter
+export interface SystemContext {
+  privacyMode: PrivacyLevel;
+  isOnBattery?: boolean;
+  batteryLevel?: number;
+  networkQuality?: 'excellent' | 'good' | 'poor';
+  timeOfDay?: number;
+}
+
 // Export as object for compatibility
 export const contextAnalyzer = {
   analyzeContext,

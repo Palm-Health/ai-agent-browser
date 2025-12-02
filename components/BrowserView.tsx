@@ -4,6 +4,7 @@ import { Tab, InteractiveElement } from '../types';
 import GlobeIcon from './icons/GlobeIcon';
 import BookmarkIcon from './icons/BookmarkIcon';
 import { bookmarkService } from '../services/bookmarkService';
+import { saveSnapshot } from '../src/browser/vault/vaultService';
 
 interface BrowserViewProps {
     tabs: Tab[];
@@ -19,6 +20,7 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
     const { tabs, activeTabId, onTabChange, onAddTab, onCloseTab, onPageUpdate, onBookmark } = props;
     const iframeRefs = useRef<{ [key: number]: HTMLIFrameElement | null }>({});
     const [urlInputValue, setUrlInputValue] = useState('');
+    const [saveStatus, setSaveStatus] = useState('');
 
     const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -189,6 +191,34 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
         }
     };
 
+    const handleSaveToVault = async () => {
+        if (!activeTab) return;
+        const iframe = iframeRefs.current[activeTab.id];
+        const html = iframe?.contentDocument?.documentElement?.outerHTML;
+        if (!html) {
+            setSaveStatus('No page content to save.');
+            return;
+        }
+
+        try {
+            await saveSnapshot({
+                url: activeTab.url,
+                html,
+                meta: { title: activeTab.title },
+            });
+            setSaveStatus('Saved to Vault!');
+        } catch (err) {
+            console.error('Failed to save snapshot', err);
+            setSaveStatus('Failed to save.');
+        }
+    };
+
+    useEffect(() => {
+        if (!saveStatus) return;
+        const timer = setTimeout(() => setSaveStatus(''), 2500);
+        return () => clearTimeout(timer);
+    }, [saveStatus]);
+
     return (
         <div className="flex flex-col h-full glass rounded-lg border border-white/20 shadow-deep">
             {/* Tab Bar */}
@@ -226,17 +256,25 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
                         />
                     </form>
                 </div>
-                 <button 
-                    onClick={() => activeTab && onBookmark(activeTab.url, activeTab.title)} 
+                 <button
+                    onClick={() => activeTab && onBookmark(activeTab.url, activeTab.title)}
                     className={`p-2 transition-all duration-300 hover:scale-110 ${
-                        bookmarkService.getBookmarks().some(b => b.url === activeTab?.url) 
-                            ? 'text-cyan-400 glow-cyan' 
+                        bookmarkService.getBookmarks().some(b => b.url === activeTab?.url)
+                            ? 'text-cyan-400 glow-cyan'
                             : 'text-gray-400 hover:text-cyan-400 hover:glow-cyan'
-                    }`} 
+                    }`}
                     title="Bookmark this page"
                 >
                     <BookmarkIcon className="w-6 h-6" />
                  </button>
+                 <button
+                    onClick={handleSaveToVault}
+                    className="ml-2 px-3 py-2 text-xs font-semibold rounded-md border border-white/20 text-gray-200 hover:text-cyan-400 hover:border-cyan-400 transition-all duration-200 hover:glow-cyan"
+                    title="Save this page to your offline vault"
+                >
+                    Save to Vault
+                </button>
+                {saveStatus && <span className="ml-3 text-xs text-cyan-300">{saveStatus}</span>}
             </div>
             {/* Iframe container */}
             <div className="flex-grow relative">
