@@ -8,13 +8,15 @@ This document provides a comprehensive review of the `ai-agent-browser` reposito
 
 ## 🚨 CRITICAL SECURITY ISSUES
 
-### 1. Hardcoded API Keys and Secrets (CRITICAL)
+### 1. Hardcoded API Keys and Secrets (CRITICAL) - FIXED
 
-**Location:** `services/config.ts` (lines 147-224)
+**Location:** `services/config.ts` (MCP server configurations section)
 
 **Severity:** CRITICAL
 
-**Description:** The configuration file contains hardcoded API keys and secrets that should NEVER be committed to a repository:
+**Status:** ✅ FIXED in this PR
+
+**Description:** The configuration file contained hardcoded API keys and secrets that should NEVER be committed to a repository. The following credentials were exposed:
 
 ```typescript
 // Examples of exposed secrets:
