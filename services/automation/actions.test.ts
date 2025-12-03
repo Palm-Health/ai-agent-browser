@@ -1,5 +1,10 @@
+import os from 'node:os';
+import path from 'node:path';
+
 import { Action, Plan, ActionResult, ActionExecutor, PermissionService, AIBrowserBridge } from '../services/automation/actions';
 import { ActionExecutor as ExecutorClass } from '../services/automation/executor';
+
+const tmpPath = (fileName: string) => path.join(os.tmpdir(), fileName);
 
 // Mock implementations for testing
 class MockPermissionService implements PermissionService {
@@ -126,7 +131,7 @@ describe('Action DSL System', () => {
           { kind: 'waitFor', selector: '.loading', timeoutMs: 10000 },
           { kind: 'waitFor', handle: 'h_wait123', timeoutMs: 5000 },
           { kind: 'scrollIntoView', handle: 'h_scroll456', timeoutMs: 3000 },
-          { kind: 'screenshot', fullPage: false, path: '/tmp/screenshot.png', timeoutMs: 2000 }
+          { kind: 'screenshot', fullPage: false, path: tmpPath('screenshot.png'), timeoutMs: 2000 }
         ]
       };
 
@@ -351,7 +356,7 @@ describe('Action DSL System', () => {
       const plan: Plan = {
         id: 'test-screenshot-save',
         steps: [
-          { kind: 'screenshot', fullPage: true, path: '/tmp/test-screenshot.png' }
+          { kind: 'screenshot', fullPage: true, path: tmpPath('test-screenshot.png') }
         ]
       };
 
