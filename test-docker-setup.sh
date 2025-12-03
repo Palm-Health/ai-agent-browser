@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Test script to validate Docker setup for AI Agent Browser
 # This script can be run locally before building the Docker image
@@ -23,6 +24,7 @@ else
 fi
 
 # Test 2: Check if Docker daemon is running
+
 echo ""
 echo "2️⃣  Checking Docker daemon..."
 if docker info &> /dev/null; then
@@ -33,24 +35,21 @@ else
 fi
 
 # Test 3: Validate Dockerfile syntax
+
 echo ""
 echo "3️⃣  Validating Dockerfile..."
 if [ -f "Dockerfile" ]; then
     echo -e "${GREEN}✅ Dockerfile exists${NC}"
-    
-    # Check for required directives
     if grep -q "FROM node:" Dockerfile; then
         echo -e "${GREEN}✅ Base image is specified${NC}"
     else
         echo -e "${RED}❌ Base image not found${NC}"
     fi
-    
     if grep -q "EXPOSE" Dockerfile; then
         echo -e "${GREEN}✅ Port exposure configured${NC}"
     else
         echo -e "${YELLOW}⚠️  No EXPOSE directive found${NC}"
     fi
-    
     if grep -q "CMD" Dockerfile; then
         echo -e "${GREEN}✅ CMD directive found${NC}"
     else
@@ -62,12 +61,11 @@ else
 fi
 
 # Test 4: Validate docker-compose.yml
+
 echo ""
 echo "4️⃣  Validating docker-compose.yml..."
 if [ -f "docker-compose.yml" ]; then
     echo -e "${GREEN}✅ docker-compose.yml exists${NC}"
-    
-    # Validate syntax
     if docker compose config --quiet 2>/dev/null; then
         echo -e "${GREEN}✅ docker-compose.yml syntax is valid${NC}"
     else
@@ -79,18 +77,16 @@ else
 fi
 
 # Test 5: Check .dockerignore
+
 echo ""
 echo "5️⃣  Checking .dockerignore..."
 if [ -f ".dockerignore" ]; then
     echo -e "${GREEN}✅ .dockerignore exists${NC}"
-    
-    # Check for important entries
     if grep -q "node_modules" .dockerignore; then
         echo -e "${GREEN}✅ node_modules is excluded${NC}"
     else
         echo -e "${YELLOW}⚠️  node_modules not excluded${NC}"
     fi
-    
     if grep -q ".env" .dockerignore; then
         echo -e "${GREEN}✅ Environment files are excluded${NC}"
     else
@@ -101,6 +97,7 @@ else
 fi
 
 # Test 6: Check environment file setup
+
 echo ""
 echo "6️⃣  Checking environment configuration..."
 if [ -f ".env.example" ]; then
@@ -108,12 +105,12 @@ if [ -f ".env.example" ]; then
 else
     echo -e "${YELLOW}⚠️  .env.example not found${NC}"
 fi
-
 if [ -f ".env.local" ] || [ -f ".env" ]; then
     echo -e "${YELLOW}⚠️  Warning: .env or .env.local exists (ensure it's in .gitignore)${NC}"
 fi
 
 # Test 7: Check package.json for required scripts
+
 echo ""
 echo "7️⃣  Checking package.json scripts..."
 if [ -f "package.json" ]; then
@@ -122,7 +119,6 @@ if [ -f "package.json" ]; then
     else
         echo -e "${RED}❌ 'dev' script not found${NC}"
     fi
-    
     if grep -q '"build"' package.json; then
         echo -e "${GREEN}✅ 'build' script found${NC}"
     else
@@ -134,11 +130,13 @@ else
 fi
 
 # Test 8: Check network connectivity (if running)
+
 echo ""
 echo "8️⃣  Checking network setup..."
 echo -e "${GREEN}✅ Docker network configuration in docker-compose.yml looks good${NC}"
 
 # Summary
+
 echo ""
 echo "=============================================="
 echo -e "${GREEN}✅ All critical tests passed!${NC}"
@@ -149,3 +147,5 @@ echo "2. Run: docker compose up --build"
 echo "3. Access the app at http://localhost:5173"
 echo ""
 echo "For more details, see DOCKER.md"
+
+exit 0

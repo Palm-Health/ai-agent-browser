@@ -1,13 +1,60 @@
 import { MCPServer, MCPTool, MCPResource, MCPServerConfig } from '../../types';
+import { configService } from '../config';
 
 export class MCPManager {
   private servers: Map<string, MCPServer> = new Map();
   private clients: Map<string, any> = new Map();
   private eventListeners: Map<string, ((event: any) => void)[]> = new Map();
+  private registeredConfigs: Map<string, MCPServerConfig> = new Map();
 
   constructor() {
-    // Disable auto-initialization to prevent startup issues
-    // this.initializeDefaultServers();
+    // Defer loading to avoid circular dependency issues
+    // Load after a short delay to ensure configService is ready
+    if (typeof window !== 'undefined') {
+      setTimeout(() => this.loadConfiguredServers(), 100);
+    } else {
+      // In Node.js/Electron context, load immediately
+      this.loadConfiguredServers();
+    }
+  }
+
+  /**
+   * Load all MCP server configurations from ConfigService and register them
+   * This ensures all servers show up in the list, even if they don't auto-start
+   */
+  private loadConfiguredServers(): void {
+    try {
+      const configs = configService.getMCPServerConfigs();
+      for (const config of configs) {
+        this.registerServer(config);
+      }
+      console.log(`✅ Loaded ${configs.length} MCP server configurations`);
+    } catch (error) {
+      console.error('Failed to load MCP server configurations:', error);
+    }
+  }
+
+  /**
+   * Register a server configuration without starting it
+   * This allows the server to appear in lists and be started on demand
+   */
+  registerServer(config: MCPServerConfig): void {
+    if (!this.servers.has(config.id)) {
+      const server: MCPServer = {
+        id: config.id,
+        name: config.name,
+        description: `MCP server for ${config.name}`,
+        version: '1.0.0',
+        status: 'disconnected',
+        endpoint: config.endpoint,
+        tools: [],
+        resources: [],
+        capabilities: [],
+      };
+      this.servers.set(config.id, server);
+      this.registeredConfigs.set(config.id, config);
+      console.log(`Registered MCP server: ${config.name} (${config.id})`);
+    }
   }
 
   private async initializeDefaultServers() {
@@ -61,22 +108,42 @@ export class MCPManager {
     }
   }
 
-  async startServer(config: MCPServerConfig): Promise<MCPServer> {
+  async startServer(configOrId: MCPServerConfig | string): Promise<MCPServer> {
     try {
+      // If a string ID is provided, look up the registered config
+      let config: MCPServerConfig;
+      if (typeof configOrId === 'string') {
+        const registeredConfig = this.registeredConfigs.get(configOrId);
+        if (!registeredConfig) {
+          throw new Error(`MCP server configuration not found: ${configOrId}`);
+        }
+        config = registeredConfig;
+      } else {
+        config = configOrId;
+        // Register the config if not already registered
+        if (!this.registeredConfigs.has(config.id)) {
+          this.registerServer(config);
+        }
+      }
+
       console.log(`Starting MCP server: ${config.name}`);
       
-      // Create server instance
-      const server: MCPServer = {
-        id: config.id,
-        name: config.name,
-        description: `MCP server for ${config.name}`,
-        version: '1.0.0',
-        status: 'connected',
-        endpoint: config.endpoint,
-        tools: [],
-        resources: [],
-        capabilities: [],
-      };
+      // Get or create server instance
+      let server = this.servers.get(config.id);
+      if (!server) {
+        server = {
+          id: config.id,
+          name: config.name,
+          description: `MCP server for ${config.name}`,
+          version: '1.0.0',
+          status: 'connecting',
+          endpoint: config.endpoint,
+          tools: [],
+          resources: [],
+          capabilities: [],
+        };
+        this.servers.set(config.id, server);
+      }
 
       // Initialize MCP client connection
       const client = await this.createMCPClient(config);
@@ -90,7 +157,6 @@ export class MCPManager {
       server.resources = resources;
       server.status = 'connected';
 
-      this.servers.set(config.id, server);
       this.emit('server-started', server);
 
       console.log(`MCP server ${config.name} started successfully with ${tools.length} tools and ${resources.length} resources`);
@@ -98,17 +164,23 @@ export class MCPManager {
 
     } catch (error) {
       console.error(`Failed to start MCP server ${config.name}:`, error);
-      const server: MCPServer = {
-        id: config.id,
-        name: config.name,
-        description: `MCP server for ${config.name}`,
-        version: '1.0.0',
-        status: 'error',
-        tools: [],
-        resources: [],
-        capabilities: [],
-      };
-      this.servers.set(config.id, server);
+      // Get or create server instance for error state
+      let server = this.servers.get(config.id);
+      if (!server) {
+        server = {
+          id: config.id,
+          name: config.name,
+          description: `MCP server for ${config.name}`,
+          version: '1.0.0',
+          status: 'error',
+          tools: [],
+          resources: [],
+          capabilities: [],
+        };
+        this.servers.set(config.id, server);
+      } else {
+        server.status = 'error';
+      }
       throw error;
     }
   }
@@ -186,6 +258,14 @@ export class MCPManager {
 
   getAllServers(): MCPServer[] {
     return Array.from(this.servers.values());
+  }
+
+  /**
+   * Reload server configurations from ConfigService
+   * Useful when configuration changes dynamically
+   */
+  reloadConfiguredServers(): void {
+    this.loadConfiguredServers();
   }
 
   private async createMCPClient(config: MCPServerConfig): Promise<any> {

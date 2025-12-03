@@ -1,0 +1,14 @@
+frontend:
+- any: ['**/*.{ts,tsx,css,html,scss,json}']
+
+backend:
+- any: ['electron/**/*', 'services/**/*', 'package.json', 'package-lock.json']
+
+docker:
+- any: ['Dockerfile', 'docker-compose.yml', '*.sh', '.dockerignore']
+
+ci:
+- any: ['.github/**/*']
+
+documentation:
+- any: ['**/*.md']

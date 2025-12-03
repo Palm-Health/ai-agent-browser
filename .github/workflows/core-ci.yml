@@ -1,5 +1,5 @@
 # .github/workflows/build-and-test.yml
-name: Build & Test (Node + Electron + Docker)
+name: Core CI
 
 on:
   push:
@@ -77,6 +77,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Fix line endings for scripts
+        run: |
+          find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
 
       - name: Set up QEMU (multi-arch)
         uses: docker/setup-qemu-action@v3

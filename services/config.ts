@@ -255,8 +255,24 @@ export class ConfigService {
           id: 'unreal-mcp',
           name: 'Unreal Engine MCP Server',
           type: 'local',
-          command: 'uv',
-          args: ['--directory', 'D:\\GitHub\\unreal-engine-mcp#\\Python', 'run', 'unreal_mcp_server_advanced.py'],
+          // Using python -m uv to ensure uv is accessible via Python installation
+          // Repository: https://github.com/flopperam/unreal-engine-mcp
+          // Installed at: D:\GitHub\unreal-engine-mcp
+          command: 'python',
+          args: ['-m', 'uv', '--directory', 'D:\\GitHub\\unreal-engine-mcp\\Python', 'run', 'unreal_mcp_server_advanced.py'],
+          autoStart: false,
+          timeout: 30000,
+          retries: 3,
+        },
+        {
+          id: 'desktop-commander',
+          name: 'Desktop Commander MCP Server',
+          type: 'local',
+          // Desktop Commander enables AI-driven management of files, terminal commands, and deployments
+          // Package: @wonderwhy-er/desktop-commander
+          // Website: https://desktopcommander.app
+          command: 'npx.cmd',
+          args: ['@wonderwhy-er/desktop-commander@latest'],
           autoStart: false,
           timeout: 30000,
           retries: 3,

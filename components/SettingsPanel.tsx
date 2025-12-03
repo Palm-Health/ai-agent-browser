@@ -1,22 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { configService } from '../services/config';
 import { authService } from '../services/authService';
 import { extensionManager } from '../services/extensionManager';
 import { passwordManagerService } from '../services/passwordManager';
 import { storageService } from '../services/storageService';
+import { mcpManager } from '../services/mcp/mcpManager';
+import { MCPServer } from '../types';
 import { ImportWizard } from './ImportWizard';
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
 
-type Section = 'general' | 'privacy' | 'appearance' | 'extensions' | 'passwords' | 'import' | 'account' | 'ai';
+type Section = 'general' | 'privacy' | 'appearance' | 'extensions' | 'passwords' | 'import' | 'account' | 'ai' | 'mcp';
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const [activeSection, setActiveSection] = useState<Section>('general');
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [config, setConfig] = useState(configService.getConfig());
+  const [mcpServers, setMcpServers] = useState<MCPServer[]>([]);
   const user = authService.getCurrentUser();
+
+  useEffect(() => {
+    // Load MCP servers
+    const loadServers = () => {
+      setMcpServers(mcpManager.getAllServers());
+    };
+    loadServers();
+    // Refresh every 2 seconds to catch status changes
+    const interval = setInterval(loadServers, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSave = () => {
     configService.saveConfig();
@@ -289,6 +303,73 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     </div>
   );
 
+  const renderMCP = () => (
+    <div className="settings-section">
+      <h2>MCP Servers</h2>
+      
+      {mcpServers.length === 0 ? (
+        <div className="empty-state">
+          <p>No MCP servers configured</p>
+        </div>
+      ) : (
+        <div className="mcp-servers-list">
+          {mcpServers.map(server => (
+            <div key={server.id} className="mcp-server-item">
+              <div className="mcp-server-header">
+                <div>
+                  <h3>{server.name}</h3>
+                  <p className="mcp-server-id">ID: {server.id}</p>
+                </div>
+                <div className={`mcp-server-status status-${server.status}`}>
+                  {server.status === 'connected' ? '🟢 Connected' : 
+                   server.status === 'connecting' ? '🟡 Connecting' :
+                   server.status === 'error' ? '🔴 Error' : '⚪ Disconnected'}
+                </div>
+              </div>
+              <p className="mcp-server-description">{server.description}</p>
+              <div className="mcp-server-stats">
+                <span>{server.tools.length} tools</span>
+                <span>{server.resources.length} resources</span>
+              </div>
+              <div className="mcp-server-actions">
+                {server.status === 'disconnected' ? (
+                  <button 
+                    className="primary" 
+                    onClick={async () => {
+                      try {
+                        await mcpManager.startServer(server.id);
+                        setMcpServers(mcpManager.getAllServers());
+                      } catch (error) {
+                        console.error('Failed to start server:', error);
+                        alert(`Failed to start ${server.name}: ${error}`);
+                      }
+                    }}
+                  >
+                    Start Server
+                  </button>
+                ) : (
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await mcpManager.stopServer(server.id);
+                        setMcpServers(mcpManager.getAllServers());
+                      } catch (error) {
+                        console.error('Failed to stop server:', error);
+                        alert(`Failed to stop ${server.name}: ${error}`);
+                      }
+                    }}
+                  >
+                    Stop Server
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   const renderAI = () => (
     <div className="settings-section">
       <h2>AI Settings</h2>
@@ -415,6 +496,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             >
               AI Settings
             </button>
+            <button 
+              className={activeSection === 'mcp' ? 'active' : ''}
+              onClick={() => setActiveSection('mcp')}
+            >
+              MCP Servers
+            </button>
           </nav>
 
           <div className="settings-main">
@@ -426,6 +513,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             {activeSection === 'import' && renderImport()}
             {activeSection === 'account' && renderAccount()}
             {activeSection === 'ai' && renderAI()}
+            {activeSection === 'mcp' && renderMCP()}
           </div>
         </div>
 
@@ -703,6 +791,83 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           color: #888;
           text-align: center;
           padding: 48px 24px;
+        }
+
+        .mcp-servers-list {
+          display: grid;
+          gap: 16px;
+        }
+
+        .mcp-server-item {
+          background: #2a2a2a;
+          padding: 20px;
+          border-radius: 8px;
+          border: 1px solid #444;
+        }
+
+        .mcp-server-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 12px;
+        }
+
+        .mcp-server-header h3 {
+          margin: 0 0 4px 0;
+          color: #fff;
+          font-size: 16px;
+        }
+
+        .mcp-server-id {
+          margin: 0;
+          color: #888;
+          font-size: 12px;
+          font-family: monospace;
+        }
+
+        .mcp-server-status {
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .status-connected {
+          background: rgba(74, 169, 74, 0.2);
+          color: #4aa94a;
+        }
+
+        .status-connecting {
+          background: rgba(255, 200, 0, 0.2);
+          color: #ffc800;
+        }
+
+        .status-error {
+          background: rgba(221, 68, 68, 0.2);
+          color: #dd4444;
+        }
+
+        .status-disconnected {
+          background: rgba(136, 136, 136, 0.2);
+          color: #888;
+        }
+
+        .mcp-server-description {
+          margin: 8px 0;
+          color: #aaa;
+          font-size: 14px;
+        }
+
+        .mcp-server-stats {
+          display: flex;
+          gap: 16px;
+          margin: 12px 0;
+          color: #888;
+          font-size: 12px;
+        }
+
+        .mcp-server-actions {
+          margin-top: 12px;
         }
       `}</style>
     </>
