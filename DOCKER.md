@@ -58,8 +58,8 @@ The application will automatically:
 If you prefer not to use Docker Compose:
 
 ```bash
-# Build the image
-docker build -t ai-agent-browser .
+# Build the image (use DOCKER_BUILDKIT=0 to avoid npm compatibility issues)
+DOCKER_BUILDKIT=0 docker build -t ai-agent-browser .
 
 # Run the container
 docker run -p 5173:5173 \
@@ -75,6 +75,8 @@ docker stop ai-browser
 # Remove the container
 docker rm ai-browser
 ```
+
+> **Note**: The `DOCKER_BUILDKIT=0` flag is required because there's a known compatibility issue between Docker BuildKit and npm that can cause npm install to fail silently. If you encounter "vite: not found" or similar errors during build, make sure BuildKit is disabled.
 
 ## Port Configuration
 
@@ -146,8 +148,15 @@ If connectivity fails:
 
 If dependencies fail to install:
 1. Clear node_modules: `rm -rf node_modules`
-2. Rebuild the image: `docker-compose build --no-cache`
+2. Rebuild the image with BuildKit disabled: `DOCKER_BUILDKIT=0 docker-compose build --no-cache`
 3. Start again: `docker-compose up`
+
+### "vite: not found" or Build Errors
+
+If you see errors like "vite: not found" during the Docker build:
+1. This is usually caused by Docker BuildKit compatibility issues with npm
+2. Disable BuildKit: `export DOCKER_BUILDKIT=0`
+3. Rebuild: `docker-compose build --no-cache` or `docker build -t ai-agent-browser .`
 
 ### API Keys Not Working
 
