@@ -136,6 +136,12 @@ export class MCPToolRegistry {
     return permissions[toolName] || [{ type: 'execute', scope: 'general', requiresConfirmation: false }];
   }
 
+  registerTool(tool: Tool): void {
+    const toolKey = this.resolveToolName(tool.name, tool.serverId || 'local');
+    this.tools.set(toolKey, tool);
+    this.addToCategory(tool);
+  }
+
   private addToCategory(tool: Tool): void {
     const category = tool.category || 'general';
     if (!this.toolCategories.has(category)) {
