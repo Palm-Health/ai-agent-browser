@@ -2,6 +2,7 @@
 FROM node:20-slim
 
 # Install required system dependencies for Electron and Chromium
+# Note: Build requires DOCKER_BUILDKIT=0 due to npm/BuildKit compatibility issues
 RUN apt-get update && apt-get install -y --no-install-recommends \
   # X11 and graphics libraries
   libatk1.0-0 \
@@ -21,10 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxss1 \
   libxtst6 \
   # Additional dependencies
-  ca-certificates \
   xdg-utils \
   wget \
-  gnupg \
   # Clean up to reduce image size
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
@@ -35,8 +34,11 @@ WORKDIR /app
 # Copy package files first for better caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Skip electron binary download as we only need the web build for Docker
+ENV ELECTRON_SKIP_BINARY_DOWNLOAD=1
+
+# Install dependencies (including dev dependencies needed for build)
+RUN npm install --include=dev --ignore-scripts
 
 # Copy the rest of the application
 COPY . .
