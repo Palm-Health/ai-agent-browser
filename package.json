@@ -19,7 +19,16 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "qa:smoke": "tsx tools/qa/smoke-test.ts",
+    "browser:plan": "tsx tools/qa/smoke-test.ts --browser",
+    "browser:run": "tsx tools/qa/smoke-test.ts --browser-run",
+    "browser:suggest-selector": "tsx tools/qa/smoke-test.ts --browser-selector",
+    "marketing:campaign": "tsx tools/qa/smoke-test.ts --marketing",
+    "marketing:episode": "tsx tools/qa/smoke-test.ts --marketing",
+    "orchestrator:smoke-test": "npm run qa:smoke",
+    "healing:run-supervisor": "tsx tools/qa/smoke-test.ts --healing",
+    "observability:agent-stats": "tsx tools/qa/smoke-test.ts --observability"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
