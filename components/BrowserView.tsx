@@ -4,6 +4,7 @@ import { Tab, InteractiveElement } from '../types';
 import GlobeIcon from './icons/GlobeIcon';
 import BookmarkIcon from './icons/BookmarkIcon';
 import { bookmarkService } from '../services/bookmarkService';
+import { vaultService } from '../services/vaultService';
 
 interface BrowserViewProps {
     tabs: Tab[];
@@ -19,6 +20,7 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
     const { tabs, activeTabId, onTabChange, onAddTab, onCloseTab, onPageUpdate, onBookmark } = props;
     const iframeRefs = useRef<{ [key: number]: HTMLIFrameElement | null }>({});
     const [urlInputValue, setUrlInputValue] = useState('');
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -37,15 +39,31 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
         }
     };
 
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(null), 2500);
+    };
+
     const injectAndLoadContent = useCallback(async (tabId: number, url: string) => {
         const iframe = iframeRefs.current[tabId];
         if (!iframe) return;
+
+        if (url.startsWith('vault://')) {
+            try {
+                const { html, title } = await vaultService.renderVaultUrl(url);
+                iframe.srcdoc = html;
+                onPageUpdate(tabId, url, title, [], '');
+            } catch (error) {
+                iframe.srcdoc = `<html><body><h2>Failed to load vault page</h2><p>${(error as Error).message}</p></body></html>`;
+            }
+            return;
+        }
 
         try {
             const response = await fetch(`https://api.codetabs.com/v1/proxy?quest=${url}`);
             if (!response.ok) throw new Error(`Failed to fetch page. Status: ${response.status}`);
             const html = await response.text();
-            
+
             const doc = new DOMParser().parseFromString(html, 'text/html');
             const base = doc.createElement('base');
             base.href = url;
@@ -72,7 +90,7 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
             console.error("Error loading page via proxy:", error);
             iframe.srcdoc = `<html><body><h2>Failed to load page</h2><p>${(error as Error).message}</p></body></html>`;
         }
-    }, []);
+    }, [onPageUpdate]);
     
     const parseIframeContent = (tabId: number) => {
         const iframe = iframeRefs.current[tabId];
@@ -182,6 +200,24 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
             navigate(activeTab.id, newUrl);
         }
     };
+
+    const handleSaveToVault = async () => {
+        if (!activeTab) return;
+        const iframe = iframeRefs.current[activeTab.id];
+        const html = iframe?.contentDocument?.documentElement?.outerHTML;
+        if (!html) {
+            showToast('Unable to capture page content');
+            return;
+        }
+
+        try {
+            const snapshot = await vaultService.savePageSnapshot(activeTab.url, html, { title: activeTab.title });
+            showToast(`Saved to vault: ${snapshot.title}`);
+        } catch (error) {
+            console.error('Failed to save snapshot', error);
+            showToast('Failed to save snapshot');
+        }
+    };
     
      const handleCloseTabClick = (tabId: number) => {
         if (window.confirm('Are you sure you want to close this tab?')) {
@@ -190,7 +226,7 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
     };
 
     return (
-        <div className="flex flex-col h-full glass rounded-lg border border-white/20 shadow-deep">
+        <div className="flex flex-col h-full glass rounded-lg border border-white/20 shadow-deep relative">
             {/* Tab Bar */}
              <div className="flex items-center glass-subtle flex-shrink-0 border-b border-white/20">
                 {tabs.map(tab => (
@@ -226,16 +262,23 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
                         />
                     </form>
                 </div>
-                 <button 
-                    onClick={() => activeTab && onBookmark(activeTab.url, activeTab.title)} 
+                 <button
+                    onClick={() => activeTab && onBookmark(activeTab.url, activeTab.title)}
                     className={`p-2 transition-all duration-300 hover:scale-110 ${
-                        bookmarkService.getBookmarks().some(b => b.url === activeTab?.url) 
-                            ? 'text-cyan-400 glow-cyan' 
+                        bookmarkService.getBookmarks().some(b => b.url === activeTab?.url)
+                            ? 'text-cyan-400 glow-cyan'
                             : 'text-gray-400 hover:text-cyan-400 hover:glow-cyan'
-                    }`} 
+                    }`}
                     title="Bookmark this page"
                 >
                     <BookmarkIcon className="w-6 h-6" />
+                 </button>
+                 <button
+                    onClick={handleSaveToVault}
+                    className="ml-2 px-3 py-2 text-sm rounded-lg bg-cyan-500/20 text-cyan-100 border border-cyan-500/40 hover:bg-cyan-500/30 transition-all"
+                    title="Save page to vault"
+                 >
+                    Save to Vault
                  </button>
             </div>
             {/* Iframe container */}
@@ -252,6 +295,11 @@ const BrowserView = forwardRef((props: BrowserViewProps, ref) => {
                     />
                 ))}
             </div>
+            {toastMessage && (
+                <div className="absolute bottom-4 right-4 bg-gray-900/90 text-gray-100 px-4 py-2 rounded-lg shadow-lg border border-cyan-500/40">
+                    {toastMessage}
+                </div>
+            )}
         </div>
     );
 });
