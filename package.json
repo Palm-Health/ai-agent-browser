@@ -19,6 +19,7 @@
     "clean:git": "git clean -fd",
     "preview": "vite preview",
     "electron": "tsx electron/main.ts",
+    "qa:sentinel": "tsx tools/qa/sentinel-smoke.ts",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
