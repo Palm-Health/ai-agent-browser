@@ -1,105 +1,362 @@
 #!/usr/bin/env node
 
+import 'tsx/esm';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ToolSchema,
-} from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import puppeteer from 'puppeteer-core';
+import { analyzePage } from '../../services/agent/browser/pageUnderstanding.ts';
+import { planBrowserTask } from '../../services/agent/browser/actionPlanner.ts';
+import { executePlan } from '../../services/agent/browser/executePlan.ts';
+import { saveFlow } from '../../services/agent/browser/flows.ts';
+import { generateCampaignPlan } from '../../services/marketing/automation/contentBlueprint.ts';
+import { planEpisode as planMarketingEpisode, runContentCampaign } from '../../services/marketing/automation/contentMachine.ts';
 
-// Browser automation MCP server
+const DEFAULT_TIMEOUT = Number(process.env.BROWSER_DEFAULT_TIMEOUT_MS || 30000);
+const MEDIA_ROOT_PATH = process.env.MEDIA_ROOT_PATH || path.join(process.cwd(), 'media');
+
+function resolveExecutablePath() {
+  return process.env.BROWSER_EXECUTABLE_PATH || process.env.CHROMIUM_EXECUTABLE || process.env.CHROME_PATH;
+}
+
+async function ensureDir(dirPath) {
+  await fs.mkdir(dirPath, { recursive: true });
+}
+
+async function launchBrowser() {
+  const executablePath = resolveExecutablePath();
+  const userDataDir = process.env.BROWSER_PROFILE_DIR || process.env.PUPPETEER_USER_DATA_DIR;
+  if (!executablePath) {
+    throw new Error(
+      'No Chromium/Chrome executable configured. Set BROWSER_EXECUTABLE_PATH, CHROMIUM_EXECUTABLE, or CHROME_PATH.',
+    );
+  }
+  if (userDataDir) await ensureDir(userDataDir);
+  const launchConfig = {
+    headless: process.env.BROWSER_HEADLESS !== 'false',
+    executablePath,
+    defaultViewport: { width: 1280, height: 720 },
+    args: ['--disable-gpu', '--no-sandbox', '--disable-setuid-sandbox'],
+  };
+  if (userDataDir) launchConfig.userDataDir = userDataDir;
+  return puppeteer.launch(launchConfig);
+}
+
+async function withPage(fn) {
+  const browser = await launchBrowser();
+  const page = await browser.newPage();
+  page.setDefaultTimeout(DEFAULT_TIMEOUT);
+  try {
+    return await fn(page);
+  } finally {
+    await page.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
+}
+
+async function gotoUrl(page, url) {
+  await page.goto(url, { waitUntil: 'networkidle0', timeout: DEFAULT_TIMEOUT });
+}
+
+async function autoScroll(page, { stepPx = 500, delayMs = 250, maxScrolls = 40 } = {}) {
+  let previousHeight = await page.evaluate('document.body.scrollHeight');
+  for (let i = 0; i < maxScrolls; i++) {
+    await page.evaluate(`window.scrollBy(0, ${stepPx});`);
+    await page.waitForTimeout(delayMs);
+    const newHeight = await page.evaluate('document.body.scrollHeight');
+    if (newHeight <= previousHeight) break;
+    previousHeight = newHeight;
+  }
+}
+
+async function recordNetworkTraffic(page, fn) {
+  const entries = [];
+  const onRequest = (request) => {
+    entries.push({
+      url: request.url(),
+      method: request.method(),
+      requestHeaders: request.headers(),
+      type: request.resourceType(),
+    });
+  };
+  const onResponse = (response) => {
+    const entry = entries.find(e => e.url === response.url());
+    if (entry) {
+      entry.status = response.status();
+      entry.responseHeaders = response.headers();
+      entry.type = entry.type || response.request().resourceType();
+    } else {
+      entries.push({
+        url: response.url(),
+        method: response.request().method(),
+        status: response.status(),
+        responseHeaders: response.headers(),
+        type: response.request().resourceType(),
+      });
+    }
+  };
+  page.on('request', onRequest);
+  page.on('response', onResponse);
+  try {
+    await fn();
+  } finally {
+    page.off('request', onRequest);
+    page.off('response', onResponse);
+  }
+  return entries;
+}
+
+async function analyzePageIntel(url) {
+  return withPage(async (page) => {
+    await gotoUrl(page, url);
+    await autoScroll(page);
+    const title = await page.title();
+    const textBlocks = await page.$$eval('h1, h2, h3, p, li', elements =>
+      elements
+        .map(el => (el.textContent || '').trim())
+        .filter(Boolean)
+    );
+    const summary = textBlocks.join(' ').slice(0, 320);
+    return { url, title, summary, suggestedHooks: textBlocks.filter(t => t.length < 140).slice(0, 8) };
+  });
+}
+
+async function analyzeVideoIntel(url) {
+  return withPage(async (page) => {
+    await gotoUrl(page, url);
+    const title = await page.title();
+    const description = await page.$eval('#description', el => el.textContent || '').catch(() => undefined);
+    const channel = await page.$eval('#channel-name a', el => el.textContent || '').catch(() => undefined);
+    return { url, title, description, channel };
+  });
+}
+
+async function captureScreenshots(url, { fullPage = true } = {}, existingPage) {
+  const worker = async (page) => {
+    await gotoUrl(page, url);
+    if (fullPage) await autoScroll(page);
+    await ensureDir(MEDIA_ROOT_PATH);
+    const timestamp = Date.now();
+    const filePath = path.join(MEDIA_ROOT_PATH, `screenshot-${timestamp}.png`);
+    await page.screenshot({ path: filePath, fullPage });
+    return { path: filePath };
+  };
+
+  if (existingPage) return worker(existingPage);
+  return withPage(worker);
+}
+
+function deriveOrientation(width, height) {
+  if (!width || !height) return 'other';
+  const ratio = width / height;
+  if (Math.abs(ratio - 9 / 16) < 0.05) return '9:16';
+  if (Math.abs(ratio - 16 / 9) < 0.05) return '16:9';
+  if (Math.abs(ratio - 1) < 0.05) return '1:1';
+  return ratio > 1 ? '16:9' : '9:16';
+}
+
+async function classifyLocalClip(relativePath) {
+  const { spawn } = await import('node:child_process');
+  const resolvedRoot = path.resolve(MEDIA_ROOT_PATH) + path.sep;
+  const filePath = path.isAbsolute(relativePath)
+    ? relativePath
+    : path.join(MEDIA_ROOT_PATH, relativePath);
+  const normalized = path.resolve(filePath);
+  if (!normalized.startsWith(resolvedRoot)) {
+    throw new Error('Requested file is outside of configured media root');
+  }
+
+  const args = [
+    '-v',
+    'error',
+    '-select_streams',
+    'v:0',
+    '-show_entries',
+    'stream=width,height,duration',
+    '-of',
+    'json',
+    filePath,
+  ];
+
+  const metadata = await new Promise((resolve) => {
+    try {
+      const proc = spawn('ffprobe', args);
+      let output = '';
+      proc.stdout.on('data', (chunk) => (output += chunk.toString()));
+      proc.on('close', () => {
+        try {
+          const parsed = JSON.parse(output || '{}');
+          resolve(parsed.streams?.[0] || {});
+        } catch (error) {
+          console.warn('ffprobe parse failed', error);
+          resolve({});
+        }
+      });
+      proc.on('error', () => resolve({}));
+    } catch (error) {
+      console.warn('ffprobe unavailable', error);
+      resolve({});
+    }
+  });
+
+  const width = metadata.width ? Number(metadata.width) : undefined;
+  const height = metadata.height ? Number(metadata.height) : undefined;
+  const durationSeconds = metadata.duration ? Number(metadata.duration) : undefined;
+  const orientation = deriveOrientation(width, height);
+
+  const type = orientation === '9:16' ? 'hook' : (orientation === '16:9' && (durationSeconds || 0) > 90 ? 'talking_head' : 'broll');
+  const platformFit = orientation === '9:16' ? ['tiktok', 'reels', 'ytshorts'] : ['youtube', 'web'];
+
+  return {
+    path: filePath,
+    type,
+    topics: [],
+    persona: [],
+    platformFit,
+  };
+}
+
 class BrowserAutomationServer {
   constructor() {
-    this.server = new Server(
-      {
-        name: 'browser-automation-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
-    );
-
+    this.server = new Server({ name: 'browser-automation-server', version: '2.0.0' }, { capabilities: { tools: {} } });
     this.setupToolHandlers();
   }
 
   setupToolHandlers() {
-    // List available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: [
           {
-            name: 'navigate_to_url',
-            description: 'Navigate the browser to a specific URL',
+            name: 'marketing.browser_visit',
+            description: 'Visit a URL and return structured marketing or video intel',
+            inputSchema: {
+              type: 'object',
+              properties: { url: { type: 'string' } },
+              required: ['url'],
+            },
+          },
+          {
+            name: 'marketing.browser_capture_screenshots',
+            description: 'Visit a URL and capture screenshot(s)',
             inputSchema: {
               type: 'object',
               properties: {
-                url: {
-                  type: 'string',
-                  description: 'The URL to navigate to',
-                },
+                url: { type: 'string' },
+                fullPage: { type: 'boolean', default: true },
               },
               required: ['url'],
             },
           },
           {
-            name: 'click_element',
-            description: 'Click on an element in the current page',
+            name: 'marketing.classify_local_clip',
+            description: 'Classify a local media clip relative to the configured media root',
             inputSchema: {
               type: 'object',
-              properties: {
-                selector: {
-                  type: 'string',
-                  description: 'CSS selector for the element to click',
-                },
-                elementId: {
-                  type: 'string',
-                  description: 'ID of the element to click (alternative to selector)',
-                },
-              },
+              properties: { relativePath: { type: 'string' } },
+              required: ['relativePath'],
             },
           },
           {
-            name: 'fill_form_field',
-            description: 'Fill a form field with text',
+            name: 'marketing.scrape_competitor_page',
+            description: 'Analyze a competitor page for positioning and CTA patterns',
             inputSchema: {
               type: 'object',
-              properties: {
-                selector: {
-                  type: 'string',
-                  description: 'CSS selector for the form field',
-                },
-                elementId: {
-                  type: 'string',
-                  description: 'ID of the form field (alternative to selector)',
-                },
-                value: {
-                  type: 'string',
-                  description: 'Text to fill in the field',
-                },
-              },
-              required: ['value'],
+              properties: { url: { type: 'string' } },
+              required: ['url'],
             },
           },
           {
-            name: 'extract_page_content',
-            description: 'Extract text content from the current page',
+            name: 'marketing.plan_campaign',
+            description: 'Create a content campaign plan from a brief',
             inputSchema: {
               type: 'object',
               properties: {
-                selector: {
-                  type: 'string',
-                  description: 'CSS selector to limit extraction to specific elements',
-                },
-                includeLinks: {
-                  type: 'boolean',
-                  description: 'Whether to include link URLs in the extraction',
-                  default: false,
-                },
+                theme: { type: 'string' },
+                persona: { type: 'string', enum: ['patient', 'clinician', 'investor'] },
+                durationDays: { type: 'number' },
+                platforms: { type: 'array', items: { type: 'string' } },
+                frequencyPerDay: { type: 'number' },
+                tone: { type: 'string' },
               },
+              required: ['theme', 'persona', 'durationDays', 'platforms', 'frequencyPerDay'],
+            },
+          },
+          {
+            name: 'marketing.build_campaign',
+            description: 'Run the full content machine: plan episodes, match media, scripts, and render jobs',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                theme: { type: 'string' },
+                persona: { type: 'string', enum: ['patient', 'clinician', 'investor'] },
+                durationDays: { type: 'number' },
+                platforms: { type: 'array', items: { type: 'string' } },
+                frequencyPerDay: { type: 'number' },
+                tone: { type: 'string' },
+              },
+              required: ['theme', 'persona', 'durationDays', 'platforms', 'frequencyPerDay'],
+            },
+          },
+          {
+            name: 'marketing.plan_episode',
+            description: 'Plan and stage media/script/render plans for a single short-form episode',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                theme: { type: 'string' },
+                persona: { type: 'string', enum: ['patient', 'clinician', 'investor'] },
+                platforms: { type: 'array', items: { type: 'string' } },
+                angle: { type: 'string' },
+              },
+              required: ['theme', 'persona', 'platforms'],
+            },
+          },
+          {
+            name: 'browser.plan',
+            description: 'Generate a multi-step browser task plan from a goal',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                goal: { type: 'string' },
+                url: { type: 'string', description: 'Optional URL to inspect before planning' },
+              },
+              required: ['goal'],
+            },
+          },
+          {
+            name: 'browser.run',
+            description: 'Visit a URL, analyze the page, plan actions, and execute them',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                url: { type: 'string' },
+                goal: { type: 'string' },
+              },
+              required: ['url', 'goal'],
+            },
+          },
+          {
+            name: 'browser.learn_flow',
+            description: 'Execute a goal on a URL, then persist the resulting flow for reuse',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                goal: { type: 'string' },
+                url: { type: 'string' },
+              },
+              required: ['name', 'goal', 'url'],
+            },
+          },
+          {
+            name: 'navigate_to_url',
+            description: 'Navigate the browser to a specific URL',
+            inputSchema: {
+              type: 'object',
+              properties: { url: { type: 'string' } },
+              required: ['url'],
             },
           },
           {
@@ -108,241 +365,132 @@ class BrowserAutomationServer {
             inputSchema: {
               type: 'object',
               properties: {
-                fullPage: {
-                  type: 'boolean',
-                  description: 'Whether to capture the full page or just the viewport',
-                  default: false,
-                },
-                format: {
-                  type: 'string',
-                  enum: ['png', 'jpeg'],
-                  description: 'Image format for the screenshot',
-                  default: 'png',
-                },
+                url: { type: 'string', description: 'URL to open before screenshot' },
+                fullPage: { type: 'boolean', default: false },
               },
-            },
-          },
-          {
-            name: 'wait_for_element',
-            description: 'Wait for an element to appear on the page',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                selector: {
-                  type: 'string',
-                  description: 'CSS selector for the element to wait for',
-                },
-                timeout: {
-                  type: 'number',
-                  description: 'Maximum time to wait in milliseconds',
-                  default: 10000,
-                },
-              },
-              required: ['selector'],
-            },
-          },
-          {
-            name: 'execute_javascript',
-            description: 'Execute JavaScript code in the page context',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                code: {
-                  type: 'string',
-                  description: 'JavaScript code to execute',
-                },
-                returnResult: {
-                  type: 'boolean',
-                  description: 'Whether to return the result of the execution',
-                  default: true,
-                },
-              },
-              required: ['code'],
-            },
-          },
-          {
-            name: 'scroll_page',
-            description: 'Scroll the page in a specific direction',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                direction: {
-                  type: 'string',
-                  enum: ['up', 'down', 'left', 'right'],
-                  description: 'Direction to scroll',
-                },
-                amount: {
-                  type: 'number',
-                  description: 'Number of pixels to scroll',
-                  default: 500,
-                },
-              },
-              required: ['direction'],
+              required: ['url'],
             },
           },
         ],
       };
     });
 
-    // Handle tool calls
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-
       try {
         switch (name) {
-          case 'navigate_to_url':
-            return await this.navigateToUrl(args.url);
-          
-          case 'click_element':
-            return await this.clickElement(args.selector || args.elementId);
-          
-          case 'fill_form_field':
-            return await this.fillFormField(args.selector || args.elementId, args.value);
-          
-          case 'extract_page_content':
-            return await this.extractPageContent(args.selector, args.includeLinks);
-          
-          case 'take_screenshot':
-            return await this.takeScreenshot(args.fullPage, args.format);
-          
-          case 'wait_for_element':
-            return await this.waitForElement(args.selector, args.timeout);
-          
-          case 'execute_javascript':
-            return await this.executeJavaScript(args.code, args.returnResult);
-          
-          case 'scroll_page':
-            return await this.scrollPage(args.direction, args.amount);
-          
+          case 'marketing.browser_visit': {
+            const url = args.url;
+            const intel = url.includes('youtube.com') || url.includes('youtu.be')
+              ? await analyzeVideoIntel(url)
+              : await analyzePageIntel(url);
+            return { content: [{ type: 'text', text: JSON.stringify(intel, null, 2) }] };
+          }
+          case 'marketing.browser_capture_screenshots': {
+            const { url, fullPage } = args;
+            const captureWithLogs = await withPage(async (page) => {
+              let captureResult;
+              const network = await recordNetworkTraffic(page, async () => {
+                captureResult = await captureScreenshots(url, { fullPage }, page);
+              });
+              const capture = captureResult || (await captureScreenshots(url, { fullPage }, page));
+              return { capture, network };
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(captureWithLogs, null, 2) }] };
+          }
+          case 'marketing.classify_local_clip': {
+            const result = await classifyLocalClip(args.relativePath);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case 'marketing.scrape_competitor_page': {
+            const intel = await analyzePageIntel(args.url);
+            return { content: [{ type: 'text', text: JSON.stringify(intel, null, 2) }] };
+          }
+          case 'marketing.plan_campaign': {
+            const brief = {
+              theme: args.theme,
+              persona: args.persona,
+              durationDays: args.durationDays,
+              platforms: args.platforms,
+              frequencyPerDay: args.frequencyPerDay,
+              tone: args.tone,
+            };
+            const plan = await generateCampaignPlan(brief);
+            return { content: [{ type: 'text', text: JSON.stringify(plan, null, 2) }] };
+          }
+          case 'marketing.build_campaign': {
+            const brief = {
+              theme: args.theme,
+              persona: args.persona,
+              durationDays: args.durationDays,
+              platforms: args.platforms,
+              frequencyPerDay: args.frequencyPerDay,
+              tone: args.tone,
+            };
+            const result = await runContentCampaign(brief);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case 'marketing.plan_episode': {
+            const result = await planMarketingEpisode({
+              theme: args.theme,
+              persona: args.persona,
+              platforms: args.platforms,
+              angle: args.angle,
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case 'browser.plan': {
+            const { goal, url } = args;
+            const structure = url
+              ? await withPage(async page => {
+                  await gotoUrl(page, url);
+                  return analyzePage(page);
+                })
+              : { url: '', clickableElements: [], inputElements: [] };
+            const plan = await planBrowserTask(goal, structure);
+            return { content: [{ type: 'text', text: JSON.stringify(plan, null, 2) }] };
+          }
+          case 'browser.run': {
+            const { url, goal } = args;
+            const result = await withPage(async page => {
+              await gotoUrl(page, url);
+              const structure = await analyzePage(page);
+              const plan = await planBrowserTask(goal, { ...structure, url });
+              const execution = await executePlan(page, plan);
+              return { structure, plan, execution };
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case 'browser.learn_flow': {
+            const { name, goal, url } = args;
+            const result = await withPage(async page => {
+              await gotoUrl(page, url);
+              const structure = await analyzePage(page);
+              const plan = await planBrowserTask(goal, { ...structure, url });
+              const execution = await executePlan(page, plan);
+              await saveFlow({ name, steps: plan.steps, createdAt: new Date().toISOString() });
+              return { structure, plan, execution };
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+          }
+          case 'navigate_to_url': {
+            await withPage(async (page) => gotoUrl(page, args.url));
+            return { content: [{ type: 'text', text: `Navigated to ${args.url}` }] };
+          }
+          case 'take_screenshot': {
+            const capture = await captureScreenshots(args.url, { fullPage: args.fullPage });
+            return { content: [{ type: 'text', text: `Captured ${capture.path}` }] };
+          }
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
       } catch (error) {
         return {
-          content: [
-            {
-              type: 'text',
-              text: `Error executing tool ${name}: ${error.message}`,
-            },
-          ],
+          content: [{ type: 'text', text: `Error executing tool ${name}: ${error.message}` }],
           isError: true,
         };
       }
     });
-  }
-
-  async navigateToUrl(url) {
-    // This would integrate with the actual browser automation
-    // For now, we'll simulate the operation
-    console.log(`Navigating to: ${url}`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Successfully navigated to ${url}`,
-        },
-      ],
-    };
-  }
-
-  async clickElement(selector) {
-    console.log(`Clicking element: ${selector}`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Successfully clicked element: ${selector}`,
-        },
-      ],
-    };
-  }
-
-  async fillFormField(selector, value) {
-    console.log(`Filling field ${selector} with: ${value}`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Successfully filled field ${selector} with: ${value}`,
-        },
-      ],
-    };
-  }
-
-  async extractPageContent(selector, includeLinks) {
-    console.log(`Extracting page content${selector ? ` with selector: ${selector}` : ''}`);
-    
-    // Simulate content extraction
-    const content = {
-      title: 'Sample Page Title',
-      url: 'https://example.com',
-      text: 'This is sample page content that would be extracted.',
-      links: includeLinks ? ['https://example.com/link1', 'https://example.com/link2'] : undefined,
-    };
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(content, null, 2),
-        },
-      ],
-    };
-  }
-
-  async takeScreenshot(fullPage, format) {
-    console.log(`Taking screenshot (fullPage: ${fullPage}, format: ${format})`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Screenshot taken successfully (${format || 'png'}, ${fullPage ? 'full page' : 'viewport'})`,
-        },
-      ],
-    };
-  }
-
-  async waitForElement(selector, timeout) {
-    console.log(`Waiting for element: ${selector} (timeout: ${timeout || 10000}ms)`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Element ${selector} found after waiting`,
-        },
-      ],
-    };
-  }
-
-  async executeJavaScript(code, returnResult) {
-    console.log(`Executing JavaScript: ${code.substring(0, 100)}...`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: returnResult ? `JavaScript executed successfully. Result: ${JSON.stringify({ success: true })}` : 'JavaScript executed successfully',
-        },
-      ],
-    };
-  }
-
-  async scrollPage(direction, amount) {
-    console.log(`Scrolling ${direction} by ${amount || 500} pixels`);
-    
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Successfully scrolled ${direction} by ${amount || 500} pixels`,
-        },
-      ],
-    };
   }
 
   async run() {
@@ -352,6 +500,5 @@ class BrowserAutomationServer {
   }
 }
 
-// Start the server
 const server = new BrowserAutomationServer();
 server.run().catch(console.error);

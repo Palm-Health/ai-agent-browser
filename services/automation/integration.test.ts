@@ -1,6 +1,11 @@
+import os from 'node:os';
+import path from 'node:path';
+
 import { Action, Plan, ActionExecutor, PermissionService, AIBrowserBridge } from '../services/automation/actions';
 import { ActionExecutor as ExecutorClass } from '../services/automation/executor';
 import { aiBrowserBridge } from '../aiBridge';
+
+const tmpPath = (fileName: string) => path.join(os.tmpdir(), fileName);
 
 // Integration test for the complete action DSL system
 describe('Action DSL Integration Tests', () => {
@@ -78,7 +83,7 @@ describe('Action DSL Integration Tests', () => {
       { kind: 'waitFor', selector: '.loading' },
       { kind: 'waitFor', handle: 'h_wait123' },
       { kind: 'scrollIntoView', handle: 'h_scroll456' },
-      { kind: 'screenshot', fullPage: true, path: '/tmp/test.png' }
+      { kind: 'screenshot', fullPage: true, path: tmpPath('test.png') }
     ];
 
     const plan: Plan = {
