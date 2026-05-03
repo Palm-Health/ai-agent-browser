@@ -1,0 +1,25 @@
+{
+  "appId": "ai.palmhealth.browser",
+  "productName": "Palm Browser",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "dist/**/*",
+    "electron-dist/**/*",
+    "package.json",
+    "!**/node_modules/.cache/**",
+    "!**/test*/**",
+    "!**/*.md"
+  ],
+  "win": {
+    "target": "nsis",
+    "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "perMachine": false
+  },
+  "publish": null
+}
